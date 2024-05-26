@@ -1,0 +1,41 @@
+{
+  _id: 3611485,
+  remote_message_id: '49887',
+  account_id: 'packet-sample',
+  date_created: ISODate('2023-08-23T21:46:34.504Z'),
+  last_modified: ISODate('2023-08-30T20:36:16.630Z'),
+  publish_date: ISODate('2023-07-11T20:49:40.713Z'),
+  original_publish_date: null,
+  plugin: { plugin_id: 'switchboard_i67', submodule: 'Messages' },
+  label: 'Sample Message Label',
+  status: 'sent',
+  channel: 'sms',
+  edit_url: 'https://foo.com/edit?id=49887',
+  content: {
+    /* Standardized field names for commonly used messaging data */
+    subject: 'This team stepped up big time',
+    from_name: 'Testing Name',
+    from_email: 'test@test.com',
+    text: 'Sample text content',
+    html:'Sample html content',
+  },
+  remote_data: {
+    /* open fields for other arbitrary remote content */
+    slug: 'sample-slug',
+    list: {
+      
+    },
+    remote_sample_statistics: {
+      total_messages: 0,
+      total_processed: 0,
+      total_delivered: 0,
+      total_form_responses: 0,
+      clicks: 0,
+      replies: 0,
+      opt_outs: 0,
+      total_donations: 0,
+      total_amount: '0.0000',
+      cost_estimate: '0.0000'
+    }
+  }
+}
