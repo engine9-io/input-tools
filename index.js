@@ -5,6 +5,7 @@ const os = require('node:os');
 const unzipper = require('unzipper');
 const archiver = require('archiver');
 const { mkdirp } = require('mkdirp');
+const etl = require('etl');
 
 function getStringArray(s, nonZeroLength) {
   let a = s || [];
@@ -202,9 +203,70 @@ async function create(options) {
     archive.finalize();
   });
 }
+async function getManifest({ packet }) {
+  let manifest = {};
+  return new Promise((resolve, reject) => {
+    fs.createReadStream(path.resolve(__dirname, packet))
+      .pipe(unzipper.Parse())
+      .pipe(etl.map(async (entry) => {
+        if (entry.path === 'manifest.json') {
+          const content = await entry.buffer();
+          manifest = JSON.parse(content);
+        } else {
+          entry.autodrain();
+        }
+      }))
+      .promise()
+      .then(() => resolve(manifest), reject);
+  });
+}
+/*
+fs.createReadStream('scores.csv')
+  // parse the csv file
+  .pipe(etl.csv())
+  // map `date` into a javascript date and set unique _id
+  .pipe(etl.map(d => {
+    d._id = d.person_id;
+    d.date = new Date(d.date);
+    return d;
+  }))
+  // collect 1000 records at a time for bulk-insert
+  .pipe(etl.collect(1000))
+  // upsert records to elastic with max 10 concurrent server requests
+  .pipe(etl.elastic.index(esClient,'scores','records',{concurrency:10}))
+  // Switch from stream to promise chain and report done or error
+  .promise()
+  .then( () => console.log('done'), e => console.log('error',e));
+*/
+
+async function forEachPerson({
+  packet,
+  transform,
+  // batchSize = 500,
+  // bindings = {},
+}) {
+  if (!packet) throw new Error('no packet specified');
+  if (typeof transform !== 'function') throw new Error('transform function is required');
+  /*
+
+  const directory = await unzipper.Open(_path);
+  // return directory.files.map((f) => f.path);
+  const file = directory.files.find((d) => d.path === _file);
+  const tempFilename = await getTempFilename({ source: _file });
+  return new Promise((resolve, reject) => {
+    file
+      .stream()
+      .pipe(fs.createWriteStream(tempFilename))
+      .on('error', reject)
+      .on('finish', resolve);
+  });
+  */
+}
 
 module.exports = {
   list,
   extract,
   create,
+  forEachPerson,
+  getManifest,
 };
