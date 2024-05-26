@@ -242,11 +242,44 @@ fs.createReadStream('scores.csv')
 async function forEachPerson({
   packet,
   transform,
-  // batchSize = 500,
+  batchSize = 500,
   // bindings = {},
 }) {
   if (!packet) throw new Error('no packet specified');
   if (typeof transform !== 'function') throw new Error('transform function is required');
+  const manifest = await getManifest({ packet });
+  const personFile = (manifest.files || []).find((p) => p.type === 'person');
+  if (!personFile) {
+    return { no_data: true, no_person_file: true };
+  }
+
+  return new Promise((resolve, reject) => {
+    fs.createReadStream(path.resolve(__dirname, packet))
+      .pipe(unzipper.Parse())
+
+      // we should not return null here, as it will cancel the pipe,
+      // so we disable the consistent return
+      // eslint-disable-next-line consistent-return
+      .pipe(etl.map(async (entry) => {
+        if (entry.path === personFile.path) {
+          return entry
+            .pipe(etl.csv())
+            // collect batchSize records at a time for bulk-insert
+            .pipe(etl.collect(batchSize))
+            // map `date` into a javascript date and set unique _id
+            .pipe(etl.map(async function (batch) {
+              const out = await transform({ batch });
+              this.push(out);
+            }))
+            .promise()
+            .then(() => console.log('Finished person file'), reject);
+        }
+        entry.autodrain();
+      }))
+      .promise()
+      .then(() => resolve(manifest), reject);
+  });
+
   /*
 
   const directory = await unzipper.Open(_path);

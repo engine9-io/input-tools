@@ -6,7 +6,7 @@ const { create, getManifest } = require('../../index');
 describe('Test Person Packet Creator', async () => {
   it('should create a zip file', async () => {
     await create({
-      personFiles: ['test/sample/message/1000_fake_people.csv'],
+      personFiles: ['test/sample/message/5_fake_people.csv'],
       messageFiles: 'test/sample/message/message.json5',
     });
   });

@@ -1,4 +1,4 @@
-/* const {
+const {
   describe, it,
 } = require('node:test');
 const assert = require('node:assert');
@@ -10,7 +10,7 @@ describe('Test Person Packet Creator', async () => {
     let counter = 0;
     await forEachPerson(
       {
-        packet: 'test/sample/message.packet.zip',
+        packet: 'test/sample/1000_message.packet.zip',
         batchSize: 50,
         bindings: {
           // timelineOutput: { type: 'timeline', table: 'person_email', columns: ['person_id'] },
@@ -34,4 +34,3 @@ describe('Test Person Packet Creator', async () => {
     assert.equal(counter, 1000, `Expected to loop through 1000 people, actual:${counter}`);
   });
 });
-*/
