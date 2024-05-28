@@ -112,9 +112,9 @@ function appendFiles(existingFiles, _newFiles, options) {
     };
 
     if (typeof p === 'string') {
-      item.originalFilename = path.resolve(__dirname, p);
+      item.originalFilename = path.resolve(process.cwd(), p);
     } else {
-      item.originalFilename = path.resolve(__dirname, item.originalFilename);
+      item.originalFilename = path.resolve(process.cwd(), item.originalFilename);
     }
     const file = item.originalFilename.split(path.sep).pop();
     const fileParts = file.split('.');
@@ -163,12 +163,13 @@ async function create(options) {
     zlib: { level: 9 }, // Sets the compression level.
   });
   return new Promise((resolve, reject) => {
+    debug(`Setting up write stream to ${zipFilename}`);
     // listen for all archive data to be written
     // 'close' event is fired only when a file descriptor is involved
     output.on('close', () => {
       debug('archiver has been finalized and the output file descriptor has closed, calling success');
       debug(zipFilename);
-      return resolve(null, {
+      return resolve({
         filename: zipFilename,
         bytes: archive.pointer(),
       });
@@ -204,9 +205,10 @@ async function create(options) {
   });
 }
 async function getManifest({ packet }) {
+  if (!packet) throw new Error('no packet option specififed');
   let manifest = {};
   return new Promise((resolve, reject) => {
-    fs.createReadStream(path.resolve(__dirname, packet))
+    fs.createReadStream(path.resolve(process.cwd(), packet))
       .pipe(unzipper.Parse())
       .pipe(etl.map(async (entry) => {
         if (entry.path === 'manifest.json') {
@@ -220,24 +222,6 @@ async function getManifest({ packet }) {
       .then(() => resolve(manifest), reject);
   });
 }
-/*
-fs.createReadStream('scores.csv')
-  // parse the csv file
-  .pipe(etl.csv())
-  // map `date` into a javascript date and set unique _id
-  .pipe(etl.map(d => {
-    d._id = d.person_id;
-    d.date = new Date(d.date);
-    return d;
-  }))
-  // collect 1000 records at a time for bulk-insert
-  .pipe(etl.collect(1000))
-  // upsert records to elastic with max 10 concurrent server requests
-  .pipe(etl.elastic.index(esClient,'scores','records',{concurrency:10}))
-  // Switch from stream to promise chain and report done or error
-  .promise()
-  .then( () => console.log('done'), e => console.log('error',e));
-*/
 
 async function forEachPerson({
   packet,
@@ -254,7 +238,7 @@ async function forEachPerson({
   }
 
   return new Promise((resolve, reject) => {
-    fs.createReadStream(path.resolve(__dirname, packet))
+    fs.createReadStream(path.resolve(process.cwd(), packet))
       .pipe(unzipper.Parse())
 
       // we should not return null here, as it will cancel the pipe,
@@ -272,28 +256,13 @@ async function forEachPerson({
               this.push(out);
             }))
             .promise()
-            .then(() => console.log('Finished person file'), reject);
+            .then(() => {}, reject);
         }
         entry.autodrain();
       }))
       .promise()
       .then(() => resolve(manifest), reject);
   });
-
-  /*
-
-  const directory = await unzipper.Open(_path);
-  // return directory.files.map((f) => f.path);
-  const file = directory.files.find((d) => d.path === _file);
-  const tempFilename = await getTempFilename({ source: _file });
-  return new Promise((resolve, reject) => {
-    file
-      .stream()
-      .pipe(fs.createWriteStream(tempFilename))
-      .on('error', reject)
-      .on('finish', resolve);
-  });
-  */
 }
 
 module.exports = {
