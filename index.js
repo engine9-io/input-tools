@@ -1,11 +1,20 @@
 const fs = require('node:fs');
+
 const path = require('node:path');
-const debug = require('debug')('packet-tools');
 const os = require('node:os');
+const stream = require('node:stream');
+
+const { finished } = stream.promises;
+const { stringify } = require('csv');
+const debug = require('debug')('packet-tools');
+
 const unzipper = require('unzipper');
+const { uuidv7 } = require('uuidv7');
 const archiver = require('archiver');
+const handlebars = require('handlebars');
 const { mkdirp } = require('mkdirp');
 const etl = require('etl');
+const JSON5 = require('json5');
 
 function getStringArray(s, nonZeroLength) {
   let a = s || [];
@@ -116,14 +125,9 @@ function appendFiles(existingFiles, _newFiles, options) {
     } else {
       item.originalFilename = path.resolve(process.cwd(), item.originalFilename);
     }
+
     const file = item.originalFilename.split(path.sep).pop();
-    const fileParts = file.split('.');
-    if (fileParts[fileParts.length - 2] === type) {
-      item.path = file;
-    } else {
-      fileParts.splice(-1, 0, type);
-      item.path = fileParts.join('.');
-    }
+    item.path = `${type}/${file}`;
     const existingFile = existingFiles.find((f) => f.path === item.path);
     if (existingFile) throw new Error('Error adding files, duplicate path found for path:', +item.path);
     existingFiles.push(item);
@@ -134,11 +138,13 @@ async function create(options) {
   const {
     accountId = 'engine9',
     pluginId = '',
+    target = '', // target filename, creates one if not specified
     messageFiles = [], // file with contents of message, used for delivery
     personFiles = [], // files with data on people
     timelineFiles = [], // activity entry
     statisticsFiles = [], // files with aggregate statistics
   } = options;
+  if (options.peopleFiles) throw new Error('Unknown option: peopleFiles, did you mean personFiles?');
 
   const files = [];
   const dateCreated = new Date().toISOString();
@@ -147,7 +153,8 @@ async function create(options) {
   appendFiles(files, timelineFiles, { type: 'timeline', dateCreated });
   appendFiles(files, statisticsFiles, { type: 'statistics', dateCreated });
 
-  const zipFilename = await getTempFilename({ postfix: '.packet.zip' });
+  const zipFilename = target || await getTempFilename({ postfix: '.packet.zip' });
+
   const manifest = {
     accountId,
     source: {
@@ -222,12 +229,35 @@ async function getManifest({ packet }) {
       .then(() => resolve(manifest), reject);
   });
 }
+async function getMessage({ packet }) {
+  if (!packet) throw new Error('no packet option specififed');
+  const manifest = await getManifest({ packet });
+  const messageFiles = manifest.files?.filter((d) => d.type === 'message');
+  if (!messageFiles?.length) throw new Error('No message files found in packet');
+  if (messageFiles?.length > 1) throw new Error('Multiple message files found in packet');
+  const messagePath = messageFiles[0].path;
+  let message = {};
+  return new Promise((resolve, reject) => {
+    fs.createReadStream(path.resolve(process.cwd(), packet))
+      .pipe(unzipper.Parse())
+      .pipe(etl.map(async (entry) => {
+        if (entry.path === messagePath) {
+          const content = await entry.buffer();
+          message = JSON5.parse(content);
+        } else {
+          entry.autodrain();
+        }
+      }))
+      .promise()
+      .then(() => resolve(message), reject);
+  });
+}
 
 async function forEachPerson({
   packet,
   transform,
   batchSize = 500,
-  // bindings = {},
+  bindings = {},
 }) {
   if (!packet) throw new Error('no packet specified');
   if (typeof transform !== 'function') throw new Error('transform function is required');
@@ -236,6 +266,55 @@ async function forEachPerson({
   if (!personFile) {
     return { no_data: true, no_person_file: true };
   }
+
+  const transformArguments = {};
+  // An array of promises that must be completed, such as writing to disk
+  const bindingPromises = [];
+
+  const bindingNames = Object.keys(bindings);
+  // eslint-disable-next-line no-await-in-loop
+  await Promise.all(bindingNames.map(async (bindingName) => {
+    const binding = bindings[bindingName];
+    if (!binding.type) throw new Error(`type is required for binding ${bindingName}`);
+    if (binding.type === 'packet-output-timeline') {
+      const timelineFile = await getTempFilename({ postfix: '.csv' });
+      manifest.newTimelineFile = timelineFile;
+      console.log(`Writing timeline file:${timelineFile}`);
+      const timelineOutputStream = new stream.Readable({
+        objectMode: true,
+      });
+      // eslint-disable-next-line no-underscore-dangle
+      timelineOutputStream._read = () => {};
+
+      transformArguments[bindingName] = timelineOutputStream;
+      const timelinePromise = finished(
+        timelineOutputStream
+          .pipe(new stream.Transform({
+            objectMode: true,
+            transform(obj) {
+              this.push({
+                uuid: uuidv7(),
+                entry_type: obj.entry_type || 'UNKNOWN',
+                person_id: obj.person_id || 0,
+                reference_id: obj.reference_id || 0,
+              });
+            },
+          }))
+          .pipe(stringify({
+            header: true,
+          }))
+          .pipe(fs.createWriteStream(timelineFile)),
+      );
+
+      bindingPromises.push(timelinePromise);
+    } else if (binding.type === 'packet-message') {
+      transformArguments[bindingName] = getMessage({ packet });
+    } else if (binding.type === 'handlebars') {
+      transformArguments[bindingName] = handlebars;
+    } else {
+      throw new Error(`Unsupported binding type for binding ${bindingName}: ${binding.type}`);
+    }
+  }));
 
   return new Promise((resolve, reject) => {
     fs.createReadStream(path.resolve(process.cwd(), packet))
@@ -252,10 +331,11 @@ async function forEachPerson({
             .pipe(etl.collect(batchSize))
             // map `date` into a javascript date and set unique _id
             .pipe(etl.map(async function (batch) {
-              const out = await transform({ batch });
+              const out = await transform({ batch, handlebars, ...transformArguments });
               this.push(out);
             }))
             .promise()
+            .then(Promise.all(bindingPromises))
             .then(() => {}, reject);
         }
         entry.autodrain();
@@ -271,4 +351,5 @@ module.exports = {
   create,
   forEachPerson,
   getManifest,
+  getMessage,
 };

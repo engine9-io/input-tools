@@ -2,9 +2,9 @@
   _id: 3611485,
   remote_message_id: '49887',
   account_id: 'packet-sample',
-  date_created: ISODate('2023-08-23T21:46:34.504Z'),
-  last_modified: ISODate('2023-08-30T20:36:16.630Z'),
-  publish_date: ISODate('2023-07-11T20:49:40.713Z'),
+  date_created: '2023-08-23T21:46:34.504Z',
+  last_modified: '2023-08-30T20:36:16.630Z',
+  publish_date: '2023-07-11T20:49:40.713Z',
   original_publish_date: null,
   plugin: { plugin_id: 'switchboard_i67', submodule: 'Messages' },
   label: 'Sample Message Label',
@@ -16,14 +16,14 @@
     subject: 'This team stepped up big time',
     from_name: 'Testing Name',
     from_email: 'test@test.com',
-    text: 'Sample text content',
-    html:'Sample html content',
+    text: 'Hello {{given_name}} {{family_name}} https://foo.com/?person_id={{person_id}}',
+    html:'Hello {{given_name}} {{family_name}} <a href="https://foo.com/?person_id={{person_id}}">Click Me</a>',
   },
   remote_data: {
     /* open fields for other arbitrary remote content */
     slug: 'sample-slug',
     list: {
-      
+
     },
     remote_sample_statistics: {
       total_messages: 0,

@@ -5,24 +5,29 @@ const assert = require('node:assert');
 
 const { forEachPerson } = require('../../index');
 
-describe('Test Person Packet For Each', async () => {
-  it('forEachPerson Should loop through 1000 sample people', async () => {
+describe('Test Person Packet Message For Each', async () => {
+  it('message: forEachPerson should loop through 1000 sample people', async () => {
+    const messageContent = [];
     let counter = 0;
     await forEachPerson(
       {
-        packet: 'test/sample/1000_message.packet.zip',
+        packet: 'test/sample/5_message.packet.zip',
         batchSize: 50,
         bindings: {
           timelineOutputStream: { type: 'packet-output-timeline' },
+          message: { type: 'packet-message' },
+          handlebars: { type: 'handlebars' },
         },
-        async transform(props) {
-          const {
-            batch,
-            timelineOutputStream,
-          } = props;
-          if (!timelineOutputStream) {
-            throw new Error(`packet-output-timeline did not put a timelineOutputStream into the bindings:${Object.keys(props)}`);
-          }
+        async transform({
+          batch,
+          message,
+          handlebars,
+          timelineOutputStream,
+        }) {
+          const template = handlebars.compile(message.content.text);
+          batch.forEach((person) => {
+            messageContent.push(template(person));
+          });
           batch.forEach(() => { counter += 1; });
           batch.forEach((p) => {
             timelineOutputStream.push(
@@ -36,6 +41,7 @@ describe('Test Person Packet For Each', async () => {
         },
       },
     );
+    console.log(messageContent);
     assert.equal(counter, 1000, `Expected to loop through 1000 people, actual:${counter}`);
   });
 });
