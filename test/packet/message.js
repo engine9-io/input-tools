@@ -2,6 +2,7 @@ const {
   describe, it,
 } = require('node:test');
 const assert = require('node:assert');
+const debug = require('debug')('message');
 
 const { forEachPerson } = require('../../index');
 
@@ -9,13 +10,13 @@ describe('Test Person Packet Message For Each', async () => {
   it('message: forEachPerson should loop through 1000 sample people', async () => {
     const messageContent = [];
     let counter = 0;
-    await forEachPerson(
+    const results = await forEachPerson(
       {
-        packet: 'test/sample/5_message.packet.zip',
+        packet: 'test/sample/1000_message.packet.zip',
         batchSize: 50,
         bindings: {
-          timelineOutputStream: { type: 'packet-output-timeline' },
-          message: { type: 'packet-message' },
+          timelineOutputStream: { type: 'packet.output.timeline' },
+          message: { type: 'packet.message' },
           handlebars: { type: 'handlebars' },
         },
         async transform({
@@ -41,7 +42,7 @@ describe('Test Person Packet Message For Each', async () => {
         },
       },
     );
-    console.log(messageContent);
+    debug(results);
     assert.equal(counter, 1000, `Expected to loop through 1000 people, actual:${counter}`);
   });
 });

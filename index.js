@@ -70,8 +70,7 @@ async function getTempFilename(options) {
 
   if (prefix) prefix += '_';
 
-  const rand = `_${Math.floor(Math.random() * 10000)}`;
-  const p = `${dir}/${prefix || ''}${new Date().toISOString().slice(0, -1).replace(/[^0-9]/g, '_')}${rand}${postfix || '.txt'}`;
+  const p = `${dir}/${prefix || ''}${uuidv7()}${postfix || '.txt'}`;
   return p;
 }
 
@@ -242,14 +241,126 @@ async function getMessage({ packet }) {
       .pipe(unzipper.Parse())
       .pipe(etl.map(async (entry) => {
         if (entry.path === messagePath) {
-          const content = await entry.buffer();
-          message = JSON5.parse(content);
+          const buffer = await entry.buffer();
+          const content = await buffer.toString();
+
+          try {
+            message = JSON5.parse(content);
+          } catch (e) {
+            debug(`Erroring parsing message content from ${messagePath}`, content);
+            throw e;
+          }
         } else {
           entry.autodrain();
         }
       }))
       .promise()
       .then(() => resolve(message), reject);
+  });
+}
+
+async function getTimelineOutputStream() {
+  const timelineFile = await getTempFilename({ postfix: '.csv' });
+  debug(`Writing timeline file:${timelineFile}`);
+  const timelineOutputStream = new stream.Readable({
+    objectMode: true,
+  });
+  // eslint-disable-next-line no-underscore-dangle
+  timelineOutputStream._read = () => {};
+
+  const timelineOutputTransform = new stream.Transform({
+    objectMode: true,
+    transform(obj, enc, cb) {
+      // debug(`Pushing person_id ${obj.person_id}`, enc, cb);
+      this.push({
+        uuid: uuidv7(),
+        entry_type: obj.entry_type || 'UNKNOWN',
+        person_id: obj.person_id || 0,
+        reference_id: obj.reference_id || 0,
+      });
+      cb();
+    },
+  });
+
+  const finishTimelinePromise = finished(timelineOutputStream
+    .pipe(timelineOutputTransform)
+    .pipe(stringify({ header: true }))
+    .pipe(fs.createWriteStream(timelineFile)));
+  return {
+    stream: timelineOutputStream,
+    promises: [finishTimelinePromise],
+    files: [timelineFile],
+  };
+}
+
+async function forEachPersonImpl({
+  packet,
+  transform,
+  batchSize = 500,
+  bindings = {},
+  start = 0, // which record to start with, defaults to 0
+  end, // record to end with, non-inclusive
+}) {
+  const manifest = await getManifest({ packet });
+  const personFile = (manifest.files || []).find((p) => p.type === 'person');
+  let timelineFiles = [];
+
+  const transformArguments = {};
+  // An array of promises that must be completed, such as writing to disk
+  let bindingPromises = [];
+
+  const bindingNames = Object.keys(bindings);
+  // eslint-disable-next-line no-await-in-loop
+  await Promise.all(bindingNames.map(async (bindingName) => {
+    const binding = bindings[bindingName];
+    if (!binding.type) throw new Error(`type is required for binding ${bindingName}`);
+    if (binding.type === 'packet.output.timeline') {
+      const { stream: streamImpl, promises, files } = await getTimelineOutputStream({});
+      transformArguments[bindingName] = streamImpl;
+      bindingPromises = bindingPromises.concat(promises || []);
+      timelineFiles = timelineFiles.concat(files);
+    } else if (binding.type === 'packet.message') {
+      transformArguments[bindingName] = await getMessage({ packet });
+    } else if (binding.type === 'handlebars') {
+      transformArguments[bindingName] = handlebars;
+    } else {
+      throw new Error(`Unsupported binding type for binding ${bindingName}: ${binding.type}`);
+    }
+  }));
+  let recordCounter = 0;
+
+  return new Promise((resolve, reject) => {
+    fs.createReadStream(path.resolve(process.cwd(), packet))
+      .pipe(unzipper.Parse())
+
+      // we should not return null here, as it will cancel the pipe,
+      // so we disable the consistent-return rule
+      // eslint-disable-next-line consistent-return
+      .pipe(etl.map(async (entry) => {
+        if (entry.path === personFile.path) {
+          return entry
+            .pipe(etl.csv())
+            // eslint-disable-next-line array-callback-return
+            .pipe(etl.map(function (item) {
+              if (recordCounter < start) return;
+              if (end && recordCounter >= end) return;
+              recordCounter += 1;
+              this.push(item);
+            }))
+            .pipe(etl.collect(batchSize))
+            .pipe(etl.map(async function (batch) {
+              const out = await transform({ batch, handlebars, ...transformArguments });
+              this.push(out);
+            }))
+            .promise()
+            .then(Promise.all(bindingPromises))
+            .then(() => {}, reject);
+        }
+        entry.autodrain();
+        // don't return null, as it will cancel the pipe
+      }))
+      .promise()
+      .then(() => resolve({ timelineFiles }), reject);
   });
 }
 
@@ -266,83 +377,19 @@ async function forEachPerson({
   if (!personFile) {
     return { no_data: true, no_person_file: true };
   }
+  const totalPersonRecords = 1000000;
+  const maxRecordsPerProcess = 1000000;
+  const parallelItems = [];
+  for (let start = 0; start < totalPersonRecords; start += maxRecordsPerProcess) {
+    let end = start + maxRecordsPerProcess;
+    if (end > totalPersonRecords) end = totalPersonRecords;
+    parallelItems.push(forEachPersonImpl({
+      packet, transform, batchSize, bindings, start, end,
+    }));
+  }
 
-  const transformArguments = {};
-  // An array of promises that must be completed, such as writing to disk
-  const bindingPromises = [];
-
-  const bindingNames = Object.keys(bindings);
-  // eslint-disable-next-line no-await-in-loop
-  await Promise.all(bindingNames.map(async (bindingName) => {
-    const binding = bindings[bindingName];
-    if (!binding.type) throw new Error(`type is required for binding ${bindingName}`);
-    if (binding.type === 'packet-output-timeline') {
-      const timelineFile = await getTempFilename({ postfix: '.csv' });
-      manifest.newTimelineFile = timelineFile;
-      console.log(`Writing timeline file:${timelineFile}`);
-      const timelineOutputStream = new stream.Readable({
-        objectMode: true,
-      });
-      // eslint-disable-next-line no-underscore-dangle
-      timelineOutputStream._read = () => {};
-
-      transformArguments[bindingName] = timelineOutputStream;
-      const timelinePromise = finished(
-        timelineOutputStream
-          .pipe(new stream.Transform({
-            objectMode: true,
-            transform(obj) {
-              this.push({
-                uuid: uuidv7(),
-                entry_type: obj.entry_type || 'UNKNOWN',
-                person_id: obj.person_id || 0,
-                reference_id: obj.reference_id || 0,
-              });
-            },
-          }))
-          .pipe(stringify({
-            header: true,
-          }))
-          .pipe(fs.createWriteStream(timelineFile)),
-      );
-
-      bindingPromises.push(timelinePromise);
-    } else if (binding.type === 'packet-message') {
-      transformArguments[bindingName] = getMessage({ packet });
-    } else if (binding.type === 'handlebars') {
-      transformArguments[bindingName] = handlebars;
-    } else {
-      throw new Error(`Unsupported binding type for binding ${bindingName}: ${binding.type}`);
-    }
-  }));
-
-  return new Promise((resolve, reject) => {
-    fs.createReadStream(path.resolve(process.cwd(), packet))
-      .pipe(unzipper.Parse())
-
-      // we should not return null here, as it will cancel the pipe,
-      // so we disable the consistent return
-      // eslint-disable-next-line consistent-return
-      .pipe(etl.map(async (entry) => {
-        if (entry.path === personFile.path) {
-          return entry
-            .pipe(etl.csv())
-            // collect batchSize records at a time for bulk-insert
-            .pipe(etl.collect(batchSize))
-            // map `date` into a javascript date and set unique _id
-            .pipe(etl.map(async function (batch) {
-              const out = await transform({ batch, handlebars, ...transformArguments });
-              this.push(out);
-            }))
-            .promise()
-            .then(Promise.all(bindingPromises))
-            .then(() => {}, reject);
-        }
-        entry.autodrain();
-      }))
-      .promise()
-      .then(() => resolve(manifest), reject);
-  });
+  const results = await Promise.all(parallelItems);
+  return results;
 }
 
 module.exports = {
@@ -352,4 +399,6 @@ module.exports = {
   forEachPerson,
   getManifest,
   getMessage,
+  getTempFilename,
+  getTimelineOutputStream,
 };

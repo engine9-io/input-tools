@@ -4,7 +4,8 @@
   "description": "Tools for dealing with Engine9 packets",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test-big-data": "export DEBUG=*;node --test --test-name-pattern=big-data",
+    "test": "export DEBUG=*;node --test --test-skip-pattern=big-data"
   },
   "author": "",
   "license": "ISC",

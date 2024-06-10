@@ -13,7 +13,7 @@ describe('Test Person Packet For Each', async () => {
         packet: 'test/sample/1000_message.packet.zip',
         batchSize: 50,
         bindings: {
-          timelineOutputStream: { type: 'packet-output-timeline' },
+          timelineOutputStream: { type: 'packet.output.timeline' },
         },
         async transform(props) {
           const {
@@ -21,7 +21,7 @@ describe('Test Person Packet For Each', async () => {
             timelineOutputStream,
           } = props;
           if (!timelineOutputStream) {
-            throw new Error(`packet-output-timeline did not put a timelineOutputStream into the bindings:${Object.keys(props)}`);
+            throw new Error(`packet.output.timeline did not put a timelineOutputStream into the bindings:${Object.keys(props)}`);
           }
           batch.forEach(() => { counter += 1; });
           batch.forEach((p) => {
