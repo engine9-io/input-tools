@@ -4,7 +4,6 @@ const path = require('node:path');
 const os = require('node:os');
 const stream = require('node:stream');
 
-const { finished } = stream.promises;
 const { stringify } = require('csv');
 const debug = require('debug')('packet-tools');
 
@@ -81,9 +80,7 @@ async function list(_path) {
     directory.files[0]
       .stream()
       .pipe(fs.createWriteStream('firstFile'))
-      .on('error', (e) => {
-        reject(e);
-      })
+      .on('error', reject)
       .on('finish', resolve);
   });
 }
@@ -271,7 +268,7 @@ async function getTimelineOutputStream() {
   const timelineOutputTransform = new stream.Transform({
     objectMode: true,
     transform(obj, enc, cb) {
-      // debug(`Pushing person_id ${obj.person_id}`, enc, cb);
+      debug(`Pushing person_id ${obj.person_id}`, enc, cb);
       this.push({
         uuid: uuidv7(),
         entry_type: obj.entry_type || 'UNKNOWN',
@@ -282,13 +279,23 @@ async function getTimelineOutputStream() {
     },
   });
 
-  const finishTimelinePromise = finished(timelineOutputStream
+  const writeStream = fs.createWriteStream(timelineFile);
+  const finishWritingTimelinePromise = new Promise((resolve, reject) => {
+    writeStream.on('finish', () => {
+      resolve();
+    }).on('error', (err) => {
+      reject(err);
+    });
+  });
+
+  timelineOutputStream
     .pipe(timelineOutputTransform)
     .pipe(stringify({ header: true }))
-    .pipe(fs.createWriteStream(timelineFile)));
+    .pipe(writeStream);
+
   return {
     stream: timelineOutputStream,
-    promises: [finishTimelinePromise],
+    promises: [finishWritingTimelinePromise],
     files: [timelineFile],
   };
 }
@@ -309,6 +316,9 @@ async function forEachPersonImpl({
   // An array of promises that must be completed, such as writing to disk
   let bindingPromises = [];
 
+  // new Streams may be created, and they have to be completed when the file is completed
+  const newStreams = [];
+
   const bindingNames = Object.keys(bindings);
   // eslint-disable-next-line no-await-in-loop
   await Promise.all(bindingNames.map(async (bindingName) => {
@@ -316,6 +326,7 @@ async function forEachPersonImpl({
     if (!binding.type) throw new Error(`type is required for binding ${bindingName}`);
     if (binding.type === 'packet.output.timeline') {
       const { stream: streamImpl, promises, files } = await getTimelineOutputStream({});
+      newStreams.push(streamImpl);
       transformArguments[bindingName] = streamImpl;
       bindingPromises = bindingPromises.concat(promises || []);
       timelineFiles = timelineFiles.concat(files);
@@ -353,14 +364,19 @@ async function forEachPersonImpl({
               this.push(out);
             }))
             .promise()
-            .then(Promise.all(bindingPromises))
+          // .then(Promise.all(bindingPromises));
             .then(() => {}, reject);
         }
         entry.autodrain();
         // don't return null, as it will cancel the pipe
       }))
       .promise()
-      .then(() => resolve({ timelineFiles }), reject);
+      .then(() => {
+        // close new streams
+        newStreams.forEach((s) => s.push(null));
+
+        resolve({ timelineFiles });
+      }, reject);
   });
 }
 
