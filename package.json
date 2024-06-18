@@ -1,6 +1,6 @@
 {
   "name": "@engine9/packet-tools",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Tools for dealing with Engine9 packets",
   "main": "index.js",
   "scripts": {
