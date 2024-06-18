@@ -1,14 +1,14 @@
 {
-  "name": "engine9-packet-tools",
-  "version": "1.0.4",
+  "name": "@engine9/packet-tools",
+  "version": "1.0.5",
   "description": "Tools for dealing with Engine9 packets",
   "main": "index.js",
   "scripts": {
     "test-big-data": "export DEBUG=*;node --test --test-name-pattern=big-data",
     "test": "export DEBUG=*;node --test --test-skip-pattern=big-data"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "Engine9",
+  "license": "GPL-3.0-or-later",
   "devDependencies": {
     "eslint": "^8.57.0",
     "eslint-config-airbnb-base": "^15.0.0",
@@ -17,19 +17,37 @@
   },
   "dependencies": {
     "archiver": "^7.0.1",
+    "aws-sdk": "^2.1643.0",
     "csv": "^6.3.9",
     "debug": "^4.3.4",
     "etl": "0.8.0",
     "handlebars": "^4.7.8",
     "json5": "^2.2.3",
     "mkdirp": "^3.0.1",
-    "unzipper": "^0.11.6",
-    "uuidv7": "^1.0.0"
+    "unzipper": "^0.12.1",
+    "uuidv7": "^1.0.0",
+    "yargs": "^17.7.2"
   },
   "overrides": {
     "etl": {
       ".": "0.8.0",
       "moment": "2.30.1"
     }
-  }
+  },
+  "directories": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/engine9-io/engine9-packet-tools.git"
+  },
+  "keywords": [
+    "Engine9",
+    "CRM",
+    "CDP"
+  ],
+  "bugs": {
+    "url": "https://github.com/engine9-io/engine9-packet-tools/issues"
+  },
+  "homepage": "https://github.com/engine9-io/engine9-packet-tools#readme"
 }

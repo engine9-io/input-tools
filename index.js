@@ -14,6 +14,7 @@ const handlebars = require('handlebars');
 const { mkdirp } = require('mkdirp');
 const etl = require('etl');
 const JSON5 = require('json5');
+const AWS = require('aws-sdk');
 
 function getStringArray(s, nonZeroLength) {
   let a = s || [];
@@ -207,52 +208,75 @@ async function create(options) {
     archive.finalize();
   });
 }
+
+async function getPacketDirectory({ packet }) {
+  if (packet.indexOf('s3://') === 0) {
+    const parts = packet.split('/');
+    const Bucket = parts[2];
+    const Key = parts.slice(3).join('/');
+    const s3Client = new AWS.S3({});
+    debug('Getting ', { Bucket, Key });
+
+    const directory = await unzipper.Open.s3(s3Client, { Bucket, Key });
+    return directory;
+  }
+  const directory = await unzipper.Open.file(packet);
+  return directory;
+}
+
 async function getManifest({ packet }) {
   if (!packet) throw new Error('no packet option specififed');
-  let manifest = {};
-  return new Promise((resolve, reject) => {
-    fs.createReadStream(path.resolve(process.cwd(), packet))
-      .pipe(unzipper.Parse())
-      .pipe(etl.map(async (entry) => {
-        if (entry.path === 'manifest.json') {
-          const content = await entry.buffer();
-          manifest = JSON.parse(content);
-        } else {
-          entry.autodrain();
-        }
-      }))
-      .promise()
-      .then(() => resolve(manifest), reject);
-  });
+  const directory = await getPacketDirectory({ packet });
+  const file = directory.files.find((d) => d.path === 'manifest.json');
+  const content = await file.buffer();
+  const manifest = JSON.parse(content.toString());
+  return manifest;
 }
-async function getMessage({ packet }) {
+
+async function getFile({ packet, type }) {
   if (!packet) throw new Error('no packet option specififed');
   const manifest = await getManifest({ packet });
-  const messageFiles = manifest.files?.filter((d) => d.type === 'message');
-  if (!messageFiles?.length) throw new Error('No message files found in packet');
-  if (messageFiles?.length > 1) throw new Error('Multiple message files found in packet');
-  const messagePath = messageFiles[0].path;
-  let message = {};
-  return new Promise((resolve, reject) => {
-    fs.createReadStream(path.resolve(process.cwd(), packet))
-      .pipe(unzipper.Parse())
-      .pipe(etl.map(async (entry) => {
-        if (entry.path === messagePath) {
-          const buffer = await entry.buffer();
-          const content = await buffer.toString();
+  const files = manifest.files?.filter((d) => d.type === type);
+  if (!files?.length) throw new Error(`No files of type ${type} found in packet`);
+  if (files?.length > 1) throw new Error(`Multiple files of type ${type} found in packet`);
+  const filePath = files[0].path;
+  const directory = await getPacketDirectory({ packet });
+  const handle = directory.files.find((d) => d.path === filePath);
 
-          try {
-            message = JSON5.parse(content);
-          } catch (e) {
-            debug(`Erroring parsing message content from ${messagePath}`, content);
-            throw e;
-          }
-        } else {
-          entry.autodrain();
-        }
-      }))
-      .promise()
-      .then(() => resolve(message), reject);
+  const content = await handle.buffer().toString();
+  if (filePath.slice(-5) === '.json' || filePath.slice(-6) === '.json5') {
+    try {
+      return JSON5.parse(content);
+    } catch (e) {
+      debug(`Erroring parsing json content from ${path}`, content);
+      throw e;
+    }
+  }
+  return content;
+}
+
+async function getStream({ packet, type }) {
+  if (!packet) throw new Error('no packet option specififed');
+  const manifest = await getManifest({ packet });
+  const files = manifest.files?.filter((d) => d.type === type);
+  if (!files?.length) throw new Error(`No files of type ${type} found in packet`);
+  if (files?.length > 1) throw new Error(`Multiple files of type ${type} found in packet`);
+  const filePath = files[0].path;
+  const directory = await getPacketDirectory({ packet });
+  const handle = directory.files.find((d) => d.path === filePath);
+  return { stream: handle.stream(), path: filePath };
+}
+
+async function downloadFile({ packet, type = 'person' }) {
+  const { stream: fileStream, path: filePath } = await getStream({ packet, type });
+  const filename = await getTempFilename({ targetFilename: filePath.split('/').pop() });
+
+  return new Promise((resolve, reject) => {
+    fileStream.pipe(fs.createWriteStream(filename))
+      .on('error', reject)
+      .on('finish', () => {
+        resolve({ filename });
+      });
   });
 }
 
@@ -331,7 +355,7 @@ async function forEachPersonImpl({
       bindingPromises = bindingPromises.concat(promises || []);
       timelineFiles = timelineFiles.concat(files);
     } else if (binding.type === 'packet.message') {
-      transformArguments[bindingName] = await getMessage({ packet });
+      transformArguments[bindingName] = await getFile({ packet, type: 'message' });
     } else if (binding.type === 'handlebars') {
       transformArguments[bindingName] = handlebars;
     } else {
@@ -414,7 +438,10 @@ module.exports = {
   create,
   forEachPerson,
   getManifest,
-  getMessage,
+  getFile,
+  getStream,
+  downloadFile,
   getTempFilename,
   getTimelineOutputStream,
+  getPacketDirectory,
 };
