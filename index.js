@@ -6,6 +6,7 @@ const stream = require('node:stream');
 
 const { stringify } = require('csv');
 const debug = require('debug')('packet-tools');
+const progress = require('debug')('info:packet-tools');
 
 const unzipper = require('unzipper');
 const { uuidv7 } = require('uuidv7');
@@ -14,7 +15,11 @@ const handlebars = require('handlebars');
 const { mkdirp } = require('mkdirp');
 const etl = require('etl');
 const JSON5 = require('json5');
-const AWS = require('aws-sdk');
+const {
+  S3Client,
+  HeadObjectCommand,
+  GetObjectCommand,
+} = require('@aws-sdk/client-s3');
 
 function getStringArray(s, nonZeroLength) {
   let a = s || [];
@@ -214,10 +219,45 @@ async function getPacketDirectory({ packet }) {
     const parts = packet.split('/');
     const Bucket = parts[2];
     const Key = parts.slice(3).join('/');
-    const s3Client = new AWS.S3({});
+    const s3Client = new S3Client({});
+
     debug('Getting ', { Bucket, Key });
 
-    const directory = await unzipper.Open.s3(s3Client, { Bucket, Key });
+    //    const directory = await unzipper.Open.s3(s3Client, { Bucket, Key });
+    let size = null;
+    const directory = await unzipper.Open.custom({
+      async size() {
+        const info = await s3Client.send(
+          new HeadObjectCommand({
+            Bucket,
+            Key,
+          }),
+        );
+        size = info.ContentLength;
+        progress(`Retrieving file of size ${size / (1024 * 1024)} MB`);
+        return info.ContentLength;
+      },
+
+      stream(offset, length) {
+        const ptStream = new stream.PassThrough();
+        s3Client.send(
+          new GetObjectCommand({
+            Bucket,
+            Key,
+            Range: `bytes=${offset}-${length ?? ''}`,
+          }),
+        )
+          .then((response) => {
+            response.Body.pipe(ptStream);
+          })
+          .catch((error) => {
+            ptStream.emit('error', error);
+          });
+
+        return ptStream;
+      },
+    });
+
     return directory;
   }
   const directory = await unzipper.Open.file(packet);
