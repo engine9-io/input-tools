@@ -484,4 +484,5 @@ module.exports = {
   getTempFilename,
   getTimelineOutputStream,
   getPacketDirectory,
+  uuidv7,
 };
