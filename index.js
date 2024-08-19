@@ -9,7 +9,7 @@ const debug = require('debug')('packet-tools');
 const progress = require('debug')('info:packet-tools');
 
 const unzipper = require('unzipper');
-const { uuidv7 } = require('uuidv7');
+const { uuidv7, uuidv7obj } = require('uuidv7');
 const archiver = require('archiver');
 const handlebars = require('handlebars');
 const { mkdirp } = require('mkdirp');
@@ -472,6 +472,33 @@ async function forEachPerson({
   return results;
 }
 
+function intToByteArray(_v) {
+  // we want to represent the input as a 8-bytes array
+  const byteArray = [0, 0, 0, 0, 0, 0, 0, 0];
+  let v = _v;
+  for (let index = 0; index < byteArray.length; index += 1) {
+    // eslint-disable-next-line no-bitwise
+    const byte = v & 0xff;
+    byteArray[index] = byte;
+    v = (v - byte) / 256;
+  }
+
+  return byteArray;
+}
+function getUUIDv7(date) { /* optional date */
+  const uuid = uuidv7obj();
+  if (date !== undefined) {
+    const d = new Date(date);
+    // isNaN behaves differently than Number.isNaN -- we're actually going for the
+    // attempted conversion here
+    // eslint-disable-next-line no-restricted-globals
+    if (isNaN(d)) throw new Error(`getUUIDv7 got an invalid date:${date || '<blank>'}`);
+    const dateBytes = intToByteArray(new Date(date).getTime()).reverse();
+    dateBytes.slice(2, 8).forEach((b, i) => { uuid.bytes[i] = b; });
+  }
+  return String(uuid);
+}
+
 module.exports = {
   list,
   extract,
@@ -484,5 +511,5 @@ module.exports = {
   getTempFilename,
   getTimelineOutputStream,
   getPacketDirectory,
-  uuidv7,
+  getUUIDv7,
 };
