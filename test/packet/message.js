@@ -35,7 +35,7 @@ describe('Test Person Packet Message For Each', async () => {
               {
                 person_id: p.person_id,
                 email: p.email,
-                entry_type_label: 'EMAIL_DELIVERED',
+                entry_type: 'EMAIL_DELIVERED',
               },
             );
           });

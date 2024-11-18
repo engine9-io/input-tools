@@ -21,6 +21,8 @@ const {
   GetObjectCommand,
 } = require('@aws-sdk/client-s3');
 
+const { TIMELINE_ENTRY_TYPES } = require('./timelineTypes');
+
 function getStringArray(s, nonZeroLength) {
   let a = s || [];
   if (typeof a === 'number') a = String(a);
@@ -519,4 +521,5 @@ module.exports = {
   getPacketDirectory,
   getUUIDv7,
   getUUIDTimestamp,
+  TIMELINE_ENTRY_TYPES,
 };
