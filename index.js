@@ -9,7 +9,7 @@ const debug = require('debug')('packet-tools');
 const progress = require('debug')('info:packet-tools');
 
 const unzipper = require('unzipper');
-const { uuidv7, uuidv7obj } = require('uuidv7');
+const { v4: uuidv4, v7: uuidv7 } = require('uuid');
 const archiver = require('archiver');
 const handlebars = require('handlebars');
 const { mkdirp } = require('mkdirp');
@@ -485,18 +485,24 @@ function intToByteArray(_v) {
 
   return byteArray;
 }
-function getUUIDv7(date) { /* optional date */
-  const uuid = uuidv7obj();
+function getUUIDv7(date, inputUuid) { /* optional date and input UUID */
+  const uuid = inputUuid || uuidv7();
+  const bytes = Buffer.from(uuid.replace(/-/g, ''), 'hex');
   if (date !== undefined) {
     const d = new Date(date);
     // isNaN behaves differently than Number.isNaN -- we're actually going for the
     // attempted conversion here
     // eslint-disable-next-line no-restricted-globals
     if (isNaN(d)) throw new Error(`getUUIDv7 got an invalid date:${date || '<blank>'}`);
-    const dateBytes = intToByteArray(new Date(date).getTime()).reverse();
-    dateBytes.slice(2, 8).forEach((b, i) => { uuid.bytes[i] = b; });
+    const dateBytes = intToByteArray(d.getTime()).reverse();
+    dateBytes.slice(2, 8).forEach((b, i) => { bytes[i] = b; });
   }
-  return String(uuid);
+  return uuidv4({ random: bytes });
+}
+/* Returns a date from a given uuid (assumed to be a v7, otherwise the results are ... weird */
+function getUUIDTimestamp(uuid) {
+  const ts = parseInt((`${uuid}`).replace(/-/g, '').slice(0, 12), 16);
+  return new Date(ts);
 }
 
 module.exports = {
@@ -512,4 +518,5 @@ module.exports = {
   getTimelineOutputStream,
   getPacketDirectory,
   getUUIDv7,
+  getUUIDTimestamp,
 };

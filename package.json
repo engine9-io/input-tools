@@ -1,6 +1,6 @@
 {
   "name": "@engine9/packet-tools",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Tools for dealing with Engine9 packets",
   "main": "index.js",
   "scripts": {
@@ -25,7 +25,7 @@
     "json5": "^2.2.3",
     "mkdirp": "^3.0.1",
     "unzipper": "^0.12.1",
-    "uuidv7": "^1.0.1",
+    "uuid": "^11.0.3",
     "yargs": "^17.7.2"
   },
   "overrides": {
