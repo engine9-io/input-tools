@@ -49,11 +49,9 @@ const PHONE_CALL_SUCCESS = 51;
 const PHONE_CALL_FAIL = 52;
 
 // Generic action
-const ACTION = 60;
-// Email contact to a target -- ETT in EN language
-const ACTION_PETITION = 61;
-// Petition signature -- PET in EN language
-const ACTION_PETITION_CONTACT_TARGET = 62;
+const FORM_SUBMIT = 60;
+const FORM_PETITION = 61;
+const FORM_PETITION_CONTACT_TARGET = 62;
 
 // unknown generic conversion on a message
 const MESSAGE_CONVERSION = 63;
@@ -61,6 +59,8 @@ const MESSAGE_CONVERSION = 63;
 const MESSAGE_CONVERSION_ADVOCACY = 64;
 // unknown transaction conversion on a message
 const MESSAGE_CONVERSION_TRANSACTION = 65;
+
+const FILE_IMPORT = 70;
 
 // DO. NOT. CHANGE. (once finalized)
 // should probably have offsets between types
@@ -108,13 +108,15 @@ const TIMELINE_ENTRY_TYPES = {
   PHONE_CALL_SUCCESS,
   PHONE_CALL_FAIL,
 
-  // actions
-  ACTION,
-  ACTION_PETITION,
-  ACTION_PETITION_CONTACT_TARGET,
+  // forms
+  FORM_SUBMIT,
+  FORM_PETITION,
+  FORM_PETITION_CONTACT_TARGET,
   MESSAGE_CONVERSION,
   MESSAGE_CONVERSION_ADVOCACY,
   MESSAGE_CONVERSION_TRANSACTION,
+
+  FILE_IMPORT,
 
 };
 module.exports = {
