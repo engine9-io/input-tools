@@ -9,7 +9,7 @@ const debug = require('debug')('packet-tools');
 const progress = require('debug')('info:packet-tools');
 
 const unzipper = require('unzipper');
-const { v4: uuidv4, v7: uuidv7 } = require('uuid');
+const { v4: uuidv4, v5: uuidv5, v7: uuidv7 } = require('uuid');
 const archiver = require('archiver');
 const handlebars = require('handlebars');
 const { mkdirp } = require('mkdirp');
@@ -487,6 +487,15 @@ function intToByteArray(_v) {
 
   return byteArray;
 }
+
+function getInputUUID(pluginId, remoteInputId) {
+  if (!pluginId) throw new Error('getInputUUID: Cowardly rejecting a blank plugin_id');
+  if (!remoteInputId) throw new Error('getInputUUID: Cowardly rejecting a blank remote_input_id, set a default');
+  // Random custom namespace for inputs -- not secure, just a namespace:
+  // 3d0e5d99-6ba9-4fab-9bb2-c32304d3df8e
+  return uuidv5(`${pluginId}:${remoteInputId}`, '3d0e5d99-6ba9-4fab-9bb2-c32304d3df8e');
+}
+
 function getUUIDv7(date, inputUuid) { /* optional date and input UUID */
   const uuid = inputUuid || uuidv7();
   const bytes = Buffer.from(uuid.replace(/-/g, ''), 'hex');
@@ -519,6 +528,7 @@ module.exports = {
   getTempFilename,
   getTimelineOutputStream,
   getPacketDirectory,
+  getInputUUID,
   getUUIDv7,
   getUUIDTimestamp,
   TIMELINE_ENTRY_TYPES,
