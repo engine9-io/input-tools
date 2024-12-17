@@ -515,6 +515,7 @@ function getUUIDTimestamp(uuid) {
   const ts = parseInt((`${uuid}`).replace(/-/g, '').slice(0, 12), 16);
   return new Date(ts);
 }
+const uuidRegex = /^[0-9,a-f]{8}-[0-9,a-f]{4}-[0-9,a-f]{4}-[0-9,a-f]{4}-[0-9,a-f]{12}$/;
 
 module.exports = {
   list,
@@ -531,5 +532,6 @@ module.exports = {
   getInputUUID,
   getUUIDv7,
   getUUIDTimestamp,
+  uuidRegex,
   TIMELINE_ENTRY_TYPES,
 };
