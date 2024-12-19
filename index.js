@@ -489,7 +489,8 @@ function intToByteArray(_v) {
 }
 
 function getPluginUUID(uniqueNamespaceLikeDomainName, valueWithinNamespace) {
-  return uuidv5(valueWithinNamespace, uniqueNamespaceLikeDomainName);
+  // Random custom namespace for plugins -- not secure, just a namespace:
+  return uuidv5(`${uniqueNamespaceLikeDomainName}::${valueWithinNamespace}`, 'f9e1024d-21ac-473c-bac6-64796dd771dd');
 }
 
 function getInputUUID(pluginId, remoteInputId) {
