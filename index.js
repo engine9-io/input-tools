@@ -488,6 +488,10 @@ function intToByteArray(_v) {
   return byteArray;
 }
 
+function getPluginUUID(uniqueNamespaceLikeDomainName, valueWithinNamespace) {
+  return uuidv5(valueWithinNamespace, uniqueNamespaceLikeDomainName);
+}
+
 function getInputUUID(pluginId, remoteInputId) {
   if (!pluginId) throw new Error('getInputUUID: Cowardly rejecting a blank plugin_id');
   if (!remoteInputId) throw new Error('getInputUUID: Cowardly rejecting a blank remote_input_id, set a default');
@@ -529,6 +533,7 @@ module.exports = {
   getTempFilename,
   getTimelineOutputStream,
   getPacketDirectory,
+  getPluginUUID,
   getInputUUID,
   getUUIDv7,
   getUUIDTimestamp,
