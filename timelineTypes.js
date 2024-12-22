@@ -119,6 +119,7 @@ const TIMELINE_ENTRY_TYPES = {
   FILE_IMPORT,
 
 };
+Object.entries(TIMELINE_ENTRY_TYPES).forEach(([k, v]) => { TIMELINE_ENTRY_TYPES[v] = k; });
 module.exports = {
   TIMELINE_ENTRY_TYPES,
 };
