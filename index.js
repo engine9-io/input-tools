@@ -68,7 +68,7 @@ async function getTempFilename(options) {
   }
   let { prefix } = options;
   let { postfix } = options;
-  const targetFormat = options.target_format || options.targetFormat;
+  const { targetFormat } = options;
   if (!postfix && targetFormat === 'csv') postfix = '.csv';
   if (options.source) {
     postfix = `_${options.source.split('/').pop()}`;

@@ -16,7 +16,7 @@
     "eslint-plugin-jsonc": "^2.15.1"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.600.0",
+    "@aws-sdk/client-s3": "^3.723.0",
     "archiver": "^7.0.1",
     "csv": "^6.3.9",
     "debug": "^4.3.4",
