@@ -2,7 +2,7 @@ const fs = require('node:fs');
 
 const path = require('node:path');
 const os = require('node:os');
-const stream = require('node:stream');
+const { PassThrough, Readable, Transform } = require('node:stream');
 
 const { stringify } = require('csv');
 const debug = require('debug')('packet-tools');
@@ -241,7 +241,7 @@ async function getPacketDirectory({ packet }) {
       },
 
       stream(offset, length) {
-        const ptStream = new stream.PassThrough();
+        const ptStream = new PassThrough();
         s3Client.send(
           new GetObjectCommand({
             Bucket,
@@ -297,7 +297,7 @@ async function getFile({ packet, type }) {
   return content;
 }
 
-async function getStream({ packet, type }) {
+async function stream({ packet, type }) {
   if (!packet) throw new Error('no packet option specififed');
   const manifest = await getManifest({ packet });
   const files = manifest.files?.filter((d) => d.type === type);
@@ -310,7 +310,7 @@ async function getStream({ packet, type }) {
 }
 
 async function downloadFile({ packet, type = 'person' }) {
-  const { stream: fileStream, path: filePath } = await getStream({ packet, type });
+  const { stream: fileStream, path: filePath } = await stream({ packet, type });
   const filename = await getTempFilename({ targetFilename: filePath.split('/').pop() });
 
   return new Promise((resolve, reject) => {
@@ -325,13 +325,13 @@ async function downloadFile({ packet, type = 'person' }) {
 async function getTimelineOutputStream() {
   const timelineFile = await getTempFilename({ postfix: '.csv' });
   debug(`Writing timeline file:${timelineFile}`);
-  const timelineOutputStream = new stream.Readable({
+  const timelineOutputStream = new Readable({
     objectMode: true,
   });
   // eslint-disable-next-line no-underscore-dangle
   timelineOutputStream._read = () => {};
 
-  const timelineOutputTransform = new stream.Transform({
+  const timelineOutputTransform = new Transform({
     objectMode: true,
     transform(obj, enc, cb) {
       debug(`Pushing person_id ${obj.person_id}`, enc, cb);
@@ -527,9 +527,9 @@ module.exports = {
   extract,
   create,
   forEachPerson,
+  stream,
   getManifest,
   getFile,
-  getStream,
   downloadFile,
   getTempFilename,
   getTimelineOutputStream,
