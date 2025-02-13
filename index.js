@@ -487,6 +487,7 @@ function intToByteArray(_v) {
 
   return byteArray;
 }
+const uuidRegex = /^[0-9,a-f]{8}-[0-9,a-f]{4}-[0-9,a-f]{4}-[0-9,a-f]{4}-[0-9,a-f]{12}$/;
 
 function getPluginUUID(uniqueNamespaceLikeDomainName, valueWithinNamespace) {
   // Random custom namespace for plugins -- not secure, just a namespace:
@@ -495,6 +496,7 @@ function getPluginUUID(uniqueNamespaceLikeDomainName, valueWithinNamespace) {
 
 function getInputUUID(pluginId, remoteInputId) {
   if (!pluginId) throw new Error('getInputUUID: Cowardly rejecting a blank plugin_id');
+  if (!uuidRegex.match(pluginId)) throw new Error(`Invalid pluginId:${pluginId}, should be a UUID`);
   if (!remoteInputId) throw new Error('getInputUUID: Cowardly rejecting a blank remote_input_id, set a default');
   // Random custom namespace for inputs -- not secure, just a namespace:
   // 3d0e5d99-6ba9-4fab-9bb2-c32304d3df8e
@@ -520,7 +522,6 @@ function getUUIDTimestamp(uuid) {
   const ts = parseInt((`${uuid}`).replace(/-/g, '').slice(0, 12), 16);
   return new Date(ts);
 }
-const uuidRegex = /^[0-9,a-f]{8}-[0-9,a-f]{4}-[0-9,a-f]{4}-[0-9,a-f]{4}-[0-9,a-f]{12}$/;
 
 module.exports = {
   list,
