@@ -540,5 +540,8 @@ module.exports = {
   getUUIDv7,
   getUUIDTimestamp,
   uuidRegex,
+  uuidv4,
+  uuidv5,
+  uuidv7,
   TIMELINE_ENTRY_TYPES,
 };
