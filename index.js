@@ -523,6 +523,48 @@ function getUUIDTimestamp(uuid) {
   return new Date(ts);
 }
 
+const requiredTimelineEntryFields = ['ts', 'entry_type_id', 'input_id', 'person_id'];
+
+function getTimelineEntryUUID(inputObject, { defaults = {} } = {}) {
+  const o = { ...defaults, ...inputObject };
+  /*
+      Outside systems CAN specify a unique UUID as remote_entry_uuid,
+      which will be used for updates, etc.
+      If not, it will be generated using whatever info we have
+    */
+  if (o.remote_entry_uuid) {
+    if (!uuidRegex.test(o.remote_entry_uuid)) throw new Error('Invalid remote_entry_uuid, it must be a UUID');
+    return o.remote_entry_uuid;
+  }
+  /*
+        Outside systems CAN specify a unique remote_entry_id
+        If not, it will be generated using whatever info we have
+      */
+
+  if (o.remote_entry_id) {
+    // get a temp ID
+    if (!o.input_id) throw new Error('Error generating timeline entry uuid -- remote_entry_id specified, but no input_id');
+    const uuid = uuidv5(o.remote_entry_id, o.input_id);
+    // Change out the ts to match the v7 sorting.
+    // But because outside specified remote_entry_id
+    // may not match this standard, uuid sorting isn't guaranteed
+    return getUUIDv7(b.ts, uuid);
+  }
+
+  const missing = requiredTimelineEntryFields
+    .filter((d) => o[d] === undefined);// 0 could be an entry type value
+
+  if (missing.length > 0) throw new Error(`Missing required fields to append an entry_id:${missing.join(',')}`);
+  const ts = new Date(o.ts);
+  const idString = `${ts.toISOString()}-${o.person_id}-${o.entry_type_id}-${o.source_code_id}`;
+  // get a temp ID
+  const uuid = uuidv5(idString, o.input_id);
+  // Change out the ts to match the v7 sorting.
+  // But because outside specified remote_entry_uuid
+  // may not match this standard, uuid sorting isn't guaranteed
+  return getUUIDv7(ts, uuid);
+}
+
 module.exports = {
   list,
   extract,
@@ -534,6 +576,7 @@ module.exports = {
   downloadFile,
   getTempFilename,
   getTimelineOutputStream,
+  getTimelineEntryUUID,
   getPacketDirectory,
   getPluginUUID,
   getInputUUID,
