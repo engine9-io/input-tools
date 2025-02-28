@@ -9,7 +9,9 @@ const debug = require('debug')('packet-tools');
 const progress = require('debug')('info:packet-tools');
 
 const unzipper = require('unzipper');
-const { v4: uuidv4, v5: uuidv5, v7: uuidv7 } = require('uuid');
+const {
+  v4: uuidv4, v5: uuidv5, v7: uuidv7, validate: uuidIsValid,
+} = require('uuid');
 const archiver = require('archiver');
 const handlebars = require('handlebars');
 const { mkdirp } = require('mkdirp');
@@ -556,7 +558,7 @@ function getTimelineEntryUUID(inputObject, { defaults = {} } = {}) {
 
   if (missing.length > 0) throw new Error(`Missing required fields to append an entry_id:${missing.join(',')}`);
   const ts = new Date(o.ts);
-  const idString = `${ts.toISOString()}-${o.person_id}-${o.entry_type_id}-${o.source_code_id}`;
+  const idString = `${ts.toISOString()}-${o.person_id}-${o.entry_type_id}-${o.source_code_id || 0}`;
   // get a temp ID
   const uuid = uuidv5(idString, o.input_id);
   // Change out the ts to match the v7 sorting.
@@ -564,7 +566,7 @@ function getTimelineEntryUUID(inputObject, { defaults = {} } = {}) {
   // may not match this standard, uuid sorting isn't guaranteed
   return getUUIDv7(ts, uuid);
 }
-function getEntryTypeId(o, { defaults = {} }) {
+function getEntryTypeId(o, { defaults = {} } = {}) {
   let id = o.entry_type_id || defaults.entry_type_id;
   if (id) return id;
   const etype = o.entry_type || defaults.entry_type;
@@ -593,7 +595,7 @@ module.exports = {
   getInputUUID,
   getUUIDv7,
   getUUIDTimestamp,
-  uuidRegex,
+  uuidIsValid,
   uuidv4,
   uuidv5,
   uuidv7,
