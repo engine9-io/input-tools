@@ -564,6 +564,17 @@ function getTimelineEntryUUID(inputObject, { defaults = {} } = {}) {
   // may not match this standard, uuid sorting isn't guaranteed
   return getUUIDv7(ts, uuid);
 }
+function getEntryTypeId(o, { defaults = {} }) {
+  let id = o.entry_type_id || defaults.entry_type_id;
+  if (id) return id;
+  const etype = o.entry_type || defaults.entry_type;
+  if (!etype) {
+    throw new Error('No entry_type, nor entry_type_id specified, specify a defaultEntryType');
+  }
+  id = TIMELINE_ENTRY_TYPES[etype];
+  if (id === undefined) throw new Error(`Invalid entry_type: ${etype}`);
+  return id;
+}
 
 module.exports = {
   list,
@@ -587,4 +598,5 @@ module.exports = {
   uuidv5,
   uuidv7,
   TIMELINE_ENTRY_TYPES,
+  getEntryTypeId,
 };
