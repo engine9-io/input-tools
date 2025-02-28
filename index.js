@@ -548,7 +548,7 @@ function getTimelineEntryUUID(inputObject, { defaults = {} } = {}) {
     // Change out the ts to match the v7 sorting.
     // But because outside specified remote_entry_id
     // may not match this standard, uuid sorting isn't guaranteed
-    return getUUIDv7(b.ts, uuid);
+    return getUUIDv7(o.ts, uuid);
   }
 
   const missing = requiredTimelineEntryFields
