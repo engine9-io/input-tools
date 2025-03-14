@@ -546,7 +546,7 @@ function getTimelineEntryUUID(inputObject, { defaults = {} } = {}) {
     if (!o.input_id) throw new Error('Error generating timeline entry uuid -- remote_entry_id specified, but no input_id');
     const uuid = uuidv5(o.remote_entry_id, o.input_id);
     // Change out the ts to match the v7 sorting.
-    // But because outside specified remote_entry_id
+    // But because outside specified remote_entry_uuid
     // may not match this standard, uuid sorting isn't guaranteed
     return getUUIDv7(o.ts, uuid);
   }
@@ -556,6 +556,10 @@ function getTimelineEntryUUID(inputObject, { defaults = {} } = {}) {
 
   if (missing.length > 0) throw new Error(`Missing required fields to append an entry_id:${missing.join(',')}`);
   const ts = new Date(o.ts);
+  // isNaN behaves differently than Number.isNaN -- we're actually going for the
+  // attempted conversion here
+  // eslint-disable-next-line no-restricted-globals
+  if (isNaN(ts)) throw new Error(`getTimelineEntryUUID got an invalid date:${o.ts || '<blank>'}`);
   const idString = `${ts.toISOString()}-${o.person_id}-${o.entry_type_id}-${o.source_code_id || 0}`;
   // get a temp ID
   const uuid = uuidv5(idString, o.input_id);
