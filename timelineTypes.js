@@ -64,6 +64,16 @@ const FORM_ADVOCACY = 66;
 
 const FILE_IMPORT = 70;
 
+// For tracking exports or data pushes
+// Generic export of data
+const EXPORT = 80;
+
+// Export specifically for pushing data to remote systems
+const EXPORT_FOR_REMOTE = 81;
+
+// Export specifically for sending out messages
+const EXPORT_FOR_MESSAGING = 81;
+
 // DO. NOT. CHANGE. (once finalized)
 // should probably have offsets between types
 // ie email, transaction, etc.
@@ -121,6 +131,9 @@ const TIMELINE_ENTRY_TYPES = {
   MESSAGE_CONVERSION_TRANSACTION,
 
   FILE_IMPORT,
+  EXPORT,
+  EXPORT_FOR_REMOTE,
+  EXPORT_FOR_MESSAGING,
 
 };
 Object.entries(TIMELINE_ENTRY_TYPES).forEach(([k, v]) => { TIMELINE_ENTRY_TYPES[v] = k; });
