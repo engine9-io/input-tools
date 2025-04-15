@@ -3,17 +3,23 @@ const {
 } = require('node:test');
 const assert = require('node:assert');
 
-const { forEachPerson } = require('../../index');
+const { ForEachEntry } = require('../../index');
 
 describe('Test Person Packet For Each', async () => {
   it('forEachPerson Should loop through 1000 sample people', async () => {
     let counter = 0;
-    await forEachPerson(
+    const forEach = new ForEachEntry();
+    await forEach.process(
       {
         packet: 'test/sample/1000_message.packet.zip',
         batchSize: 50,
         bindings: {
-          timelineOutputStream: { type: 'packet.output.timeline' },
+          timelineOutputStream: {
+            path: 'packet.output.timeline',
+            options: {
+              entry_type: 'SAMPLE',
+            },
+          },
         },
         async transform(props) {
           const {
