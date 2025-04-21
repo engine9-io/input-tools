@@ -1,4 +1,6 @@
 const fs = require('node:fs');
+
+const fsp = fs.promises;
 const path = require('node:path');
 const debug = require('debug')('packet-tools');
 const os = require('node:os');
@@ -158,17 +160,24 @@ function getDebatchTransform() {
   };
 }
 
-async function getFile({ packet, type }) {
-  if (!packet) throw new Error('no packet option specififed');
-  const manifest = await getManifest({ packet });
-  const manifestFiles = manifest.files?.filter((d) => d.type === type);
-  if (!manifestFiles?.length) throw new Error(`No files of type ${type} found in packet`);
-  if (manifestFiles?.length > 1) throw new Error(`Multiple files of type ${type} found in packet`);
-  const filePath = manifestFiles[0].path;
-  const { files } = await getPacketFiles({ packet });
-  const handle = files.find((d) => d.path === filePath);
-  const buffer = await handle.buffer();
-  const content = await buffer.toString();
+async function getFile({ filename, packet, type }) {
+  if (!packet && !filename) throw new Error('no packet option specififed');
+  let content = null;
+  let filePath = null;
+  if (packet) {
+    const manifest = await getManifest({ packet });
+    const manifestFiles = manifest.files?.filter((d) => d.type === type);
+    if (!manifestFiles?.length) throw new Error(`No files of type ${type} found in packet`);
+    if (manifestFiles?.length > 1) throw new Error(`Multiple files of type ${type} found in packet`);
+    filePath = manifestFiles[0].path;
+    const { files } = await getPacketFiles({ packet });
+    const handle = files.find((d) => d.path === filePath);
+    const buffer = await handle.buffer();
+    content = await buffer.toString();
+  } else {
+    content = await fsp.readFile(filename);
+    filePath = filename.split('/').pop();
+  }
   if (filePath.slice(-5) === '.json' || filePath.slice(-6) === '.json5') {
     try {
       return JSON5.parse(content);

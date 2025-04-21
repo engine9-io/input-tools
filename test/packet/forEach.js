@@ -2,6 +2,7 @@ const {
   describe, it,
 } = require('node:test');
 const assert = require('node:assert');
+const debug = require('debug')('test/forEach');
 
 const { ForEachEntry } = require('../../index');
 
@@ -15,7 +16,7 @@ describe('Test Person Packet For Each', async () => {
         batchSize: 50,
         bindings: {
           timelineOutputStream: {
-            path: 'packet.output.timeline',
+            path: 'output.timeline',
             options: {
               entry_type: 'SAMPLE',
             },
@@ -26,22 +27,25 @@ describe('Test Person Packet For Each', async () => {
             batch,
             timelineOutputStream,
           } = props;
-          if (!timelineOutputStream) {
-            throw new Error(`packet.output.timeline did not put a timelineOutputStream into the bindings:${Object.keys(props)}`);
+          if (timelineOutputStream) {
+            batch.forEach((p) => {
+              timelineOutputStream.push(
+                {
+                  // for testing we don't need real person_ids
+                  person_id: p.person_id || Math.floor(Math.random() * 1000000),
+                  email: p.email,
+                  entry_type: 'EMAIL_DELIVERED',
+                },
+              );
+            });
+          } else {
+            throw new Error(`output.timeline did not put a timelineOutputStream into the bindings:${Object.keys(props)}`);
           }
           batch.forEach(() => { counter += 1; });
-          batch.forEach((p) => {
-            timelineOutputStream.push(
-              {
-                person_id: p.person_id,
-                email: p.email,
-                entry_type_label: 'EMAIL_DELIVERED',
-              },
-            );
-          });
         },
       },
     );
     assert.equal(counter, 1000, `Expected to loop through 1000 people, actual:${counter}`);
   });
+  debug('Completed tests');
 });
