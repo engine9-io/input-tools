@@ -9,8 +9,10 @@ const {
   v4: uuidv4, v5: uuidv5, v7: uuidv7, validate: uuidIsValid,
 } = require('uuid');
 const archiver = require('archiver');
+const FileUtilities = require('./file/FileUtilities');
 
 const {
+  bool,
   getManifest,
   getFile,
   downloadFile,
@@ -19,7 +21,7 @@ const {
   getPacketFiles,
   getBatchTransform,
   getDebatchTransform,
-} = require('./fileTools');
+} = require('./file/tools');
 
 const ForEachEntry = require('./ForEachEntry');
 
@@ -34,6 +36,17 @@ function getStringArray(s, nonZeroLength) {
   a = a.map((x) => x.toString().trim()).filter(Boolean);
   if (nonZeroLength && a.length === 0) a = [0];
   return a;
+}
+
+/*
+  When comparing two objects, some may come from a file (thus strings), and some from
+  a database or elsewhere (not strings), so for deduping make sure to make them all strings
+*/
+function makeStrings(o) {
+  return Object.entries(o).reduce((a, [k, v]) => {
+    a[k] = (typeof v === 'object') ? JSON.stringify(v) : String(v);
+    return a;
+  }, {});
 }
 
 async function list(_path) {
@@ -277,10 +290,10 @@ function getEntryTypeId(o, { defaults = {} } = {}) {
 }
 
 module.exports = {
+  bool,
+  create,
   list,
   extract,
-  create,
-  ForEachEntry,
   stream,
   getBatchTransform,
   getDebatchTransform,
@@ -298,6 +311,9 @@ module.exports = {
   uuidv4,
   uuidv5,
   uuidv7,
+  makeStrings,
+  ForEachEntry,
+  FileUtilities,
   TIMELINE_ENTRY_TYPES,
   getEntryTypeId,
 };

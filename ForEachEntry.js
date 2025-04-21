@@ -18,7 +18,7 @@ const ValidatingReadable = require('./ValidatingReadable');
 
 const {
   getTempFilename, getBatchTransform, getFile, stream,
-} = require('./fileTools');
+} = require('./file/tools');
 
 class ForEachEntry {
   constructor() {

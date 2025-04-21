@@ -214,7 +214,17 @@ async function downloadFile({ packet, type = 'person' }) {
   });
 }
 
+function bool(x, _defaultVal) {
+  const defaultVal = (_defaultVal === undefined) ? false : _defaultVal;
+  if (x === undefined || x === null || x === '') return defaultVal;
+  if (typeof x !== 'string') return !!x;
+  if (x === '1') return true; // 0 will return false, but '1' is true
+  const y = x.toLowerCase();
+  return !!(y.indexOf('y') + 1) || !!(y.indexOf('t') + 1);
+}
+
 module.exports = {
+  bool,
   getTempFilename,
   downloadFile,
   getBatchTransform,
