@@ -232,5 +232,6 @@ module.exports = {
   getFile,
   getManifest,
   getPacketFiles,
+  getTempDir,
   stream,
 };

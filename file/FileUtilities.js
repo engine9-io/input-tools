@@ -19,9 +19,9 @@ const S3Worker = require('./S3');
 const ParquetWorker = require('./Parquet');
 const { stream: streamPacket } = require('./tools');
 
-const { bool } = require('./tools');
+const { bool, getTempDir } = require('./tools');
 
-function Worker() {}
+function Worker({ accountId }) { this.accountId = accountId; }
 
 class LineReaderTransform extends Transform {
   constructor(options = {}) {
@@ -286,6 +286,26 @@ Worker.prototype.fileToObjectStream = async function (options) {
 
   return { stream };
 };
+Worker.prototype.getFileWriterStream = async function (options = {}) {
+  const accountId = options.accountId || this.accountId;
+  if (!accountId) throw new Error('getFileWriterStream has no accountId');
+  const targetFormat = options.targetFormat || 'csv';
+  const tempDir = await getTempDir({ accountId });
+  let { fileExtendedType } = options;
+  if (fileExtendedType) fileExtendedType += '.';
+  else fileExtendedType = '';
+  // So, this could change, but it's easier to read
+  // dates in a filename than UUIDs, so this is
+  // a unique-ish filename generator
+  const uniqueNumberedDate = `${new Date().toISOString().replace(/[^0-9]*/g, '')}.${Math.floor(Math.random() * 1000)}`;
+  let filename = `${tempDir}${path.sep}${uniqueNumberedDate}.${fileExtendedType}${targetFormat}`;
+  if (bool(options.gzip, false)) filename += '.gz';
+  const stream = fs.createWriteStream(filename);
+  debug('FileWriterStream writing to file ', filename);
+
+  return { filename, stream };
+};
+
 Worker.prototype.getOutputStreams = async function (options) {
   const { filename, stream: fileWriterStream } = await this.getFileWriterStream(options);
 
@@ -339,7 +359,12 @@ Worker.prototype.getOutputStreams = async function (options) {
   };
   let stringifier;
   if (options.targetFormat === 'jsonl') {
-    stringifier = this.getJSONStringifyTransform().transform;
+    stringifier = new Transform({
+      objectMode: true,
+      transform(d, encoding, cb) {
+        cb(false, `${JSON.stringify(d)}\n`);
+      },
+    });
   } else {
     stringifier = stringify({ header: true });
   }
@@ -364,7 +389,7 @@ Worker.prototype.getOutputStreams = async function (options) {
   return { filename, streams, stats };
 };
 Worker.prototype.objectStreamToFile = async function (options) {
-  const { filename, streams, stats } = this.getOutputStreams(options);
+  const { filename, streams, stats } = await this.getOutputStreams(options);
   const { stream: inStream } = options;
   streams.unshift(inStream);
   await pipeline(
