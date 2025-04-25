@@ -189,7 +189,7 @@ async function getFile({ filename, packet, type }) {
   return content;
 }
 
-async function stream({ packet, type }) {
+async function streamPacket({ packet, type }) {
   if (!packet) throw new Error('no packet option specififed');
   const manifest = await getManifest({ packet });
   const manifestFiles = manifest.files?.filter((d) => d.type === type);
@@ -202,7 +202,7 @@ async function stream({ packet, type }) {
 }
 
 async function downloadFile({ packet, type = 'person' }) {
-  const { stream: fileStream, path: filePath } = await stream({ packet, type });
+  const { stream: fileStream, path: filePath } = await streamPacket({ packet, type });
   const filename = await getTempFilename({ targetFilename: filePath.split('/').pop() });
 
   return new Promise((resolve, reject) => {
@@ -233,5 +233,5 @@ module.exports = {
   getManifest,
   getPacketFiles,
   getTempDir,
-  stream,
+  streamPacket,
 };

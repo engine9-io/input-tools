@@ -17,7 +17,7 @@ const JSON5 = require('json5');// Useful for parsing extended JSON
 const languageEncoding = require('detect-file-encoding-and-language');
 const S3Worker = require('./S3');
 const ParquetWorker = require('./Parquet');
-const { stream: streamPacket } = require('./tools');
+const { streamPacket } = require('./tools');
 
 const { bool, getTempDir } = require('./tools');
 
