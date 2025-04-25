@@ -15,14 +15,16 @@ const csv = require('csv');
 
 const handlebars = require('handlebars');
 const ValidatingReadable = require('./ValidatingReadable');
+const FileUtilities = require('./file/FileUtilities');
 
 const {
-  getTempFilename, getBatchTransform, getFile, stream,
+  getTempFilename, getBatchTransform, getFile, streamPacket,
 } = require('./file/tools');
 
 class ForEachEntry {
-  constructor() {
+  constructor({ accountId } = {}) {
     this.timelineOutputMutex = new Mutex();
+    this.fileUtilities = new FileUtilities({ accountId });
   }
 
   getTimelineOutputStream() {
@@ -77,10 +79,10 @@ class ForEachEntry {
 
     if (filename) {
       debug(`Processing file ${filename}`);
-      inStream = (await stream({ filename })).stream;
+      inStream = (await this.fileUtilities.stream({ filename })).stream;
     } else if (packet) {
       debug(`Processing person file from packet ${packet}`);
-      inStream = (await stream({ packet, type: 'person' })).stream;
+      inStream = (await streamPacket({ packet, type: 'person' })).stream;
     }
     if (typeof userTransform !== 'function') throw new Error('async transform function is required');
     if (userTransform.length > 1) throw new Error('transform should be an async function that accepts one argument');
