@@ -659,9 +659,10 @@ Worker.prototype.move = async function ({ filename, target }) {
   await fsp.rename(filename, target);
   return { filename: target };
 };
-Worker.prototype.list.metadata = {
+Worker.prototype.move.metadata = {
   options: {
-    directory: { required: true },
+    filename: {},
+    target: {},
   },
 };
 
