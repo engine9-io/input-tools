@@ -714,4 +714,27 @@ Worker.prototype.head.metadata = {
   },
 };
 
+Worker.prototype.count = async function (options) {
+  const { stream } = await this.fileToObjectStream(options);
+  const sample = [];
+
+  const limit = options.limit || 5;
+  let records = 0;
+  // eslint-disable-next-line no-restricted-syntax
+  for await (const chunk of stream) {
+    records += 1;
+    if (records < limit) {
+      sample.push(chunk);
+    }
+  }
+
+  return { sample, records };
+};
+
+Worker.prototype.count.metadata = {
+  options: {
+    filename: { required: true },
+  },
+};
+
 module.exports = Worker;
