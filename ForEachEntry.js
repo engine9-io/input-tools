@@ -77,7 +77,7 @@ class ForEachEntry {
 
     if (filename) {
       debug(`Processing file ${filename}`);
-      inStream = fs.createReadStream(filename);
+      inStream = (await stream({ filename })).stream;
     } else if (packet) {
       debug(`Processing person file from packet ${packet}`);
       inStream = (await stream({ packet, type: 'person' })).stream;
