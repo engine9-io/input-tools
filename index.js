@@ -307,6 +307,7 @@ module.exports = {
   getManifest,
   getFile,
   downloadFile,
+  getStringArray,
   getTempFilename,
   getTimelineEntryUUID,
   getPacketFiles,
