@@ -202,7 +202,14 @@ function getPluginUUID(uniqueNamespaceLikeDomainName, valueWithinNamespace) {
   return uuidv5(`${uniqueNamespaceLikeDomainName}::${valueWithinNamespace}`, 'f9e1024d-21ac-473c-bac6-64796dd771dd');
 }
 
-function getInputUUID(pluginId, remoteInputId) {
+function getInputUUID(a, b) {
+  let pluginId = a;
+  let remoteInputId = b;
+  if (typeof a === 'object') {
+    pluginId = a.pluginId;
+    remoteInputId = a.remoteInputId;
+  }
+
   if (!pluginId) throw new Error('getInputUUID: Cowardly rejecting a blank plugin_id');
   if (!uuidIsValid(pluginId)) throw new Error(`Invalid pluginId:${pluginId}, should be a UUID`);
   const rid = (remoteInputId || '').trim();
