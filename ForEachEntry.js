@@ -5,7 +5,7 @@ const { pipeline } = require('node:stream/promises');
 const { throttle } = require('throttle-debounce');
 const parallelTransform = require('parallel-transform');
 
-const debug = require('debug')('packet-tools');
+const debug = require('debug')('@engine9-io/input-tools');
 
 const debugThrottle = throttle(1000, debug, { noLeading: false, noTrailing: false });
 

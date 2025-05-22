@@ -1,4 +1,4 @@
-# @engine9-io/input-tools
+# @engine9/input-tools
 Tools for reading, writing, and management of Engine9 style inputs.
 
 The @engine9-io/input-tools are utilities for iterating through

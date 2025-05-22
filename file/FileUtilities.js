@@ -469,7 +469,7 @@ Worker.prototype.testTransform.metadata = {
   },
 };
 
-/* Get a stream from an actual stream, or an array, or a file*/
+/* Get a stream from an actual stream, or an array, or a file */
 Worker.prototype.stream = async function (
   options,
 ) {

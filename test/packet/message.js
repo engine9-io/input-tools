@@ -15,7 +15,7 @@ describe('Test Person Packet Message For Each', async () => {
         packet: 'test/sample/1000_message.packet.zip',
         batchSize: 50,
         bindings: {
-          timelineOutputStream: { type: 'packet.output.timeline' },
+          timelineOutputStream: { type: 'output.timeline' },
           message: { type: 'packet.message' },
           handlebars: { type: 'handlebars' },
         },
