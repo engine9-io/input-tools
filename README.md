@@ -1,6 +1,6 @@
-# engine9-packet-tools
-Tools for reading, writing, and management Engine9 style packets.
+# @engine9-io/input-tools
+Tools for reading, writing, and management of Engine9 style inputs.
 
-The engine9-packet-tools are utilities for iterating through
-records, appending statistics and other files into packet files.
-It supports files and s3 files for streaming, but otherwise does not implement put and retrieving files from remote locations.
+The @engine9-io/input-tools are utilities for iterating through
+records, appending statistics and other zip files.  It's intended to be used by
+third parties to interact with engine9 instances.

@@ -2,7 +2,7 @@ const fs = require('node:fs');
 
 const path = require('node:path');
 
-const debug = require('debug')('packet-tools');
+const debug = require('debug')('@engine9-io/input-tools');
 
 const unzipper = require('unzipper');
 const {

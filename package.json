@@ -1,7 +1,7 @@
 {
-  "name": "@engine9/packet-tools",
+  "name": "@engine9/input-tools",
   "version": "1.3.6",
-  "description": "Tools for dealing with Engine9 packets",
+  "description": "Tools for dealing with Engine9 inputs",
   "main": "index.js",
   "scripts": {
     "test-big-data": "export DEBUG=*;node --test --test-name-pattern=big-data",
@@ -39,7 +39,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/engine9-io/engine9-packet-tools.git"
+    "url": "git+https://github.com/engine9-io/input-tools.git"
   },
   "keywords": [
     "Engine9",
@@ -47,7 +47,7 @@
     "CDP"
   ],
   "bugs": {
-    "url": "https://github.com/engine9-io/engine9-packet-tools/issues"
+    "url": "https://github.com/engine9-io/input-tools/issues"
   },
-  "homepage": "https://github.com/engine9-io/engine9-packet-tools#readme"
+  "homepage": "https://github.com/engine9-io/input-tools#readme"
 }

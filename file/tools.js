@@ -2,14 +2,14 @@ const fs = require('node:fs');
 
 const fsp = fs.promises;
 const path = require('node:path');
-const debug = require('debug')('packet-tools');
+const debug = require('debug')('@engine9-io/input-tools');
 const os = require('node:os');
 const { mkdirp } = require('mkdirp');
 const { Transform } = require('node:stream');
 
 const JSON5 = require('json5');
 const { PassThrough } = require('node:stream');
-const progress = require('debug')('info:packet-tools');
+const progress = require('debug')('info:@engine9-io/input-tools');
 const unzipper = require('unzipper');
 
 const {
