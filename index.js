@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 
 const path = require('node:path');
+const dayjs = require('dayjs');
 
 const debug = require('debug')('@engine9/input-tools');
 
@@ -9,6 +10,8 @@ const {
   v4: uuidv4, v5: uuidv5, v7: uuidv7, validate: uuidIsValid,
 } = require('uuid');
 const archiver = require('archiver');
+const handlebars = require('handlebars');
+
 const FileUtilities = require('./file/FileUtilities');
 
 const {
@@ -26,6 +29,22 @@ const {
 const ForEachEntry = require('./ForEachEntry');
 
 const { TIMELINE_ENTRY_TYPES } = require('./timelineTypes');
+
+function getFormattedDate(dateObject, format = 'MMM DD,YYYY') {
+  let d = dateObject;
+  if (d === 'now') d = new Date();
+  if (d) return dayjs(d).format(format);
+  return '';
+}
+
+handlebars.registerHelper('date', (d, f) => {
+  let format;
+  if (typeof f === 'string')format = f;
+  return getFormattedDate(d, format);
+});
+handlebars.registerHelper('json', (d) => JSON.stringify(d));
+
+handlebars.registerHelper('percent', (a, b) => `${((100 * a) / b).toFixed(2)}%`);
 
 function getStringArray(s, nonZeroLength) {
   let a = s || [];
@@ -300,13 +319,12 @@ module.exports = {
   bool,
   create,
   list,
+  downloadFile,
   extract,
-  streamPacket,
   getBatchTransform,
   getDebatchTransform,
   getManifest,
   getFile,
-  downloadFile,
   getStringArray,
   getTempFilename,
   getTimelineEntryUUID,
@@ -315,6 +333,8 @@ module.exports = {
   getInputUUID,
   getUUIDv7,
   getUUIDTimestamp,
+  getEntryTypeId,
+  handlebars,
   uuidIsValid,
   uuidv4,
   uuidv5,
@@ -322,6 +342,6 @@ module.exports = {
   makeStrings,
   ForEachEntry,
   FileUtilities,
+  streamPacket,
   TIMELINE_ENTRY_TYPES,
-  getEntryTypeId,
 };
