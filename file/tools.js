@@ -226,12 +226,12 @@ function bool(x, _defaultVal) {
 module.exports = {
   bool,
   getTempFilename,
+  getTempDir,
   downloadFile,
   getBatchTransform,
   getDebatchTransform,
   getFile,
   getManifest,
   getPacketFiles,
-  getTempDir,
   streamPacket,
 };
