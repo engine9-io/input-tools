@@ -192,7 +192,7 @@ Worker.prototype.listAll = async function ({ directory }) {
       ContinuationToken,
       // Delimiter: '/',
     });
-    debug(`Sending command with ContinuationToken ${ContinuationToken}`);
+    debug(`Sending List command with prefix ${Prefix} with ContinuationToken ${ContinuationToken}`);
     // eslint-disable-next-line no-await-in-loop
     const result = await s3Client.send(command);
     const newFiles = (result.Contents?.map((d) => `s3://${Bucket}/${d.Key}`) || []);
