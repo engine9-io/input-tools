@@ -364,6 +364,10 @@ function getTimelineEntryUUID(inputObject, { defaults = {} } = {}) {
   // eslint-disable-next-line no-restricted-globals
   if (isNaN(ts)) throw new Error(`getTimelineEntryUUID got an invalid date:${o.ts || '<blank>'}`);
   const idString = `${ts.toISOString()}-${o.person_id}-${o.entry_type_id}-${o.source_code_id || 0}`;
+
+  if (!uuidIsValid(o.input_id)) {
+    throw new Error(`Invalid input_id:'${o.input_id}', type ${typeof o.input_id} -- should be a uuid`);
+  }
   // get a temp ID
   const uuid = uuidv5(idString, o.input_id);
   // Change out the ts to match the v7 sorting.
