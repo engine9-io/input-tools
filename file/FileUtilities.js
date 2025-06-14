@@ -489,9 +489,9 @@ Worker.prototype.stream = async function (
   } else if (filename) {
     if (filename.startsWith('engine9-accounts/')) {
       filename = `${process.env.ENGINE9_ACCOUNT_DIR}/${filename.slice('engine9-accounts/'.length)}`;
-      debug(`Prepending file with ${process.env.ENGINE9_ACCOUNT_DIR}, filename=${filename}`);
+      // debug(`Prepending file with ${process.env.ENGINE9_ACCOUNT_DIR}, filename=${filename}`);
     } else {
-      debug(`Not prepending filename:${filename}`);
+      // debug(`Not prepending filename:${filename}`);
     }
     let encoding; let stream;
     if (filename.slice(-8) === '.parquet') {
