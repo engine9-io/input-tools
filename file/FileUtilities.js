@@ -649,9 +649,16 @@ Worker.prototype.empty.metadata = {
 };
 
 Worker.prototype.move = async function ({ filename, target }) {
-  if (!target) throw new Error('directory is required');
+  if (!target) throw new Error('target is required');
   if (target.indexOf('s3://') === 0) {
     const s3Worker = new S3Worker(this);
+
+    if (filename.indexOf('s3://') === 0) {
+      // We need to copy and delete
+      const output = await s3Worker.copy({ filename, target });
+      await s3Worker.remove({ filename });
+      return output;
+    }
     const parts = target.split('/');
     return s3Worker.put({ filename, directory: parts.slice(0, -1).join('/'), file: parts.slice(-1)[0] });
   }

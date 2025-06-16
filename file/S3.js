@@ -1,9 +1,11 @@
-const debug = require('debug')('S3Worker');
+const debug = require('debug')('@engine9-io/input/S3');
 const fs = require('node:fs');
 // eslint-disable-next-line import/no-unresolved
 const { mimeType: mime } = require('mime-type/with-db');
 const {
   S3Client,
+  CopyObjectCommand,
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
   GetObjectAttributesCommand, PutObjectCommand,
@@ -44,7 +46,7 @@ Worker.prototype.getMetadata.metadata = {
 };
 
 Worker.prototype.stream = async function ({ filename }) {
-  const s3Client = new S3Client({});
+  const s3Client = this.getClient();
   const { Bucket, Key } = getParts(filename);
   const command = new GetObjectCommand({ Bucket, Key });
   try {
@@ -57,6 +59,41 @@ Worker.prototype.stream = async function ({ filename }) {
   }
 };
 Worker.prototype.stream.metadata = {
+  options: {
+    filename: {},
+  },
+};
+
+Worker.prototype.copy = async function ({ filename, target }) {
+  if (!filename.startsWith('s3://')) throw new Error('Cowardly not copying a file not from s3 -- use put instead');
+  const s3Client = this.getClient();
+  const { Bucket, Key } = getParts(target);
+
+  debug(`Copying ${filename} to ${JSON.stringify({ Bucket, Key })}}`);
+
+  const command = new CopyObjectCommand({
+    CopySource: filename.slice(4), // remove the s3:/
+    Bucket,
+    Key,
+  });
+
+  return s3Client.send(command);
+};
+
+Worker.prototype.copy.metadata = {
+  options: {
+    filename: {},
+    target: {},
+  },
+};
+
+Worker.prototype.remove = async function ({ filename }) {
+  const s3Client = this.getClient();
+  const { Bucket, Key } = getParts(filename);
+  const command = new DeleteObjectCommand({ Bucket, Key });
+  return s3Client.send(command);
+};
+Worker.prototype.remove.metadata = {
   options: {
     filename: {},
   },
@@ -182,7 +219,7 @@ Worker.prototype.listAll = async function ({ directory }) {
   let dir = directory;
   while (dir.slice(-1) === '/') dir = dir.slice(0, -1);
   const { Bucket, Key: Prefix } = getParts(dir);
-  const s3Client = new S3Client({});
+  const s3Client = this.getClient();
   const files = [];
   let ContinuationToken = null;
   do {
