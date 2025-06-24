@@ -45,7 +45,7 @@ Worker.prototype.schema.metadata = {
 };
 
 function cleanColumnName(name) {
-  name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+  return name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
 }
 
 Worker.prototype.stream = async function (options) {
@@ -60,11 +60,10 @@ Worker.prototype.stream = async function (options) {
     if (typeof options.columns === 'string') requestedColumns = options.columns.split(',').map((d) => d.trim());
     else requestedColumns = options.columns.map((d) => (d.name ? d.name.trim() : d.trim()));
     requestedColumns.forEach((c) => {
-      columns = columns.concat(
-        fieldList.filter((f) => (
-          f.name === c || cleanColumnName(f.name) === cleanColumnName(c)
-        )).map((f) => f.name),
-      );
+      const matchingCols = fieldList.filter((f) => (
+        f.name === c || cleanColumnName(f.name) === cleanColumnName(c)
+      )).map((f) => f.name);
+      columns = columns.concat(matchingCols);
     });
   }
   let limit = 0;
