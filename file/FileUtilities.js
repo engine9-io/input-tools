@@ -15,6 +15,7 @@ const debug = require('debug')('FileWorker');
 const csv = require('csv');
 const JSON5 = require('json5');// Useful for parsing extended JSON
 const languageEncoding = require('detect-file-encoding-and-language');
+const R2Worker = require('./R2');
 const S3Worker = require('./S3');
 const ParquetWorker = require('./Parquet');
 const { streamPacket } = require('./tools');
@@ -401,7 +402,7 @@ Worker.prototype.objectStreamToFile = async function (options) {
 Worker.prototype.transform = async function (options) {
   const worker = this;
 
-  const filename = worker.getFilename(options);
+  const { filename } = options;
 
   debug(`Transforming ${filename}`);
 
@@ -498,9 +499,13 @@ Worker.prototype.stream = async function (
       const pq = new ParquetWorker(this);
       stream = (await pq.stream({ filename, columns, limit })).stream;
       encoding = 'object';
-    } else if (filename.indexOf('s3://') === 0) {
+    } else if (filename.startsWith('s3://')) {
       const s3Worker = new S3Worker(this);
       stream = (await s3Worker.stream({ filename, columns, limit })).stream;
+      encoding = 'UTF-8';
+    } else if (filename.startsWith('r2://')) {
+      const r2Worker = new R2Worker(this);
+      stream = (await r2Worker.stream({ filename, columns, limit })).stream;
       encoding = 'UTF-8';
     } else {
       // Check if the file exists, and fast fail if not
@@ -541,13 +546,13 @@ Worker.prototype.sample.metadata = {
 
 Worker.prototype.write = async function (opts) {
   const { filename, content } = opts;
-  if (filename.indexOf('s3://') === 0) {
-    const s3Worker = new S3Worker(this);
+  if (filename.startsWith('s3://') || filename.startsWith('r2://')) {
+    const worker = new (filename.startsWith('r2://') ? R2Worker : S3Worker)(this);
     const parts = filename.split('/');
     const directory = parts.slice(0, -1).join('/');
     const file = parts.slice(-1)[0];
     // debug(JSON.stringify({ parts, directory, file }));
-    await s3Worker.write({
+    await worker.write({
       directory,
       file,
       content,
@@ -559,7 +564,7 @@ Worker.prototype.write = async function (opts) {
 };
 Worker.prototype.write.metadata = {
   options: {
-    filename: { description: 'Location to write content to, can be local or s3://' },
+    filename: { description: 'Location to write content to, can be local or s3:// or r2://' },
     content: {},
   },
 };
@@ -596,9 +601,9 @@ Worker.prototype.json.metadata = {
 
 Worker.prototype.list = async function ({ directory }) {
   if (!directory) throw new Error('directory is required');
-  if (directory.indexOf('s3://') === 0) {
-    const s3Worker = new S3Worker(this);
-    return s3Worker.list({ directory });
+  if (directory.startsWith('s3://') || directory.startsWith('r2://')) {
+    const worker = new (directory.startsWith('r2://') ? R2Worker : S3Worker)(this);
+    return worker.list({ directory });
   }
   const a = await fsp.readdir(directory, { withFileTypes: true });
   return a.map((f) => ({
@@ -614,9 +619,9 @@ Worker.prototype.list.metadata = {
 
 Worker.prototype.listAll = async function ({ directory }) {
   if (!directory) throw new Error('directory is required');
-  if (directory.indexOf('s3://') === 0) {
-    const s3Worker = new S3Worker(this);
-    return s3Worker.listAll({ directory });
+  if (directory.startsWith('s3://') || directory.startsWith('r2://')) {
+    const worker = new (directory.startsWith('r2://') ? R2Worker : S3Worker)(this);
+    return worker.listAll({ directory });
   }
   const a = await fsp.readdir(directory, { recursive: true });
 
@@ -630,9 +635,9 @@ Worker.prototype.listAll.metadata = {
 
 Worker.prototype.empty = async function ({ directory }) {
   if (!directory) throw new Error('directory is required');
-  if (directory.indexOf('s3://') === 0) {
+  if (directory.startsWith('s3://') || directory.startsWith('r2://')) {
     // currently not emptying S3 this way -- dangerous
-    throw new Error('Cannot empty an s3:// directory');
+    throw new Error('Cannot empty an s3:// or r2:// directory');
   }
   const removed = [];
   // eslint-disable-next-line no-restricted-syntax
@@ -650,17 +655,22 @@ Worker.prototype.empty.metadata = {
 
 Worker.prototype.move = async function ({ filename, target }) {
   if (!target) throw new Error('target is required');
-  if (target.indexOf('s3://') === 0) {
-    const s3Worker = new S3Worker(this);
+  if (target.startsWith('s3://') || target.startsWith('r2://')) {
+    if ((target.startsWith('s3://') && filename.startsWith('r2://'))
+      || (target.startsWith('r2://') && filename.startsWith('s3://'))) {
+      throw new Error('Cowardly not copying between services');
+    }
 
-    if (filename.indexOf('s3://') === 0) {
+    const worker = new (filename.startsWith('r2://') ? R2Worker : S3Worker)(this);
+
+    if (filename.startsWith('s3://') || filename.startsWith('r2://')) {
       // We need to copy and delete
-      const output = await s3Worker.copy({ filename, target });
-      await s3Worker.remove({ filename });
+      const output = await worker.copy({ filename, target });
+      await worker.remove({ filename });
       return output;
     }
     const parts = target.split('/');
-    return s3Worker.put({ filename, directory: parts.slice(0, -1).join('/'), file: parts.slice(-1)[0] });
+    return worker.put({ filename, directory: parts.slice(0, -1).join('/'), file: parts.slice(-1)[0] });
   }
   await fsp.mkdir(path.dirname(target), { recursive: true });
   await fsp.rename(filename, target);
@@ -675,9 +685,9 @@ Worker.prototype.move.metadata = {
 
 Worker.prototype.stat = async function ({ filename }) {
   if (!filename) throw new Error('filename is required');
-  if (filename.indexOf('s3://') === 0) {
-    const s3Worker = new S3Worker(this);
-    return s3Worker.stat({ filename });
+  if (filename.startsWith('s3://') || filename.startsWith('r2://')) {
+    const worker = new (filename.startsWith('r2://') ? R2Worker : S3Worker)(this);
+    return worker.stat({ filename });
   }
   const {
     ctime,
@@ -695,6 +705,20 @@ Worker.prototype.stat = async function ({ filename }) {
   };
 };
 Worker.prototype.stat.metadata = {
+  options: {
+    filename: {},
+  },
+};
+
+Worker.prototype.download = async function ({ filename }) {
+  if (!filename) throw new Error('filename is required');
+  if (filename.startsWith('s3://') || filename.startsWith('r2://')) {
+    const worker = new (filename.startsWith('r2://') ? R2Worker : S3Worker)(this);
+    return worker.download({ filename });
+  }
+  throw new Error('Cannot download a local file');
+};
+Worker.prototype.download.metadata = {
   options: {
     filename: {},
   },

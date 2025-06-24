@@ -16,7 +16,10 @@ const { getTempFilename } = require('./tools');
 function Worker() {}
 
 function getParts(filename) {
-  if (!filename || filename.indexOf('s3://') !== 0) throw new Error(`Invalid filename for s3:${filename}`);
+  if (!filename) throw new Error(`Invalid filename: ${filename}`);
+  if (!filename.startsWith('r2://') && !filename.startsWith('s3://')) {
+    throw new Error(`Invalid filename, must start with r2:// or s3://: ${filename}`);
+  }
   const parts = filename.split('/');
   const Bucket = parts[2];
   const Key = parts.slice(3).join('/');
@@ -102,7 +105,7 @@ Worker.prototype.remove.metadata = {
 Worker.prototype.download = async function ({ filename }) {
   const file = filename.split('/').pop();
   const localPath = await getTempFilename({ targetFilename: file });
-  const s3Client = new S3Client({});
+  const s3Client = this.getClient();
   const { Bucket, Key } = getParts(filename);
   const command = new GetObjectCommand({ Bucket, Key });
   debug(`Downloading ${file} to ${localPath}`);
@@ -139,7 +142,7 @@ Worker.prototype.put = async function (options) {
   const ContentType = mime.lookup(file);
 
   debug(`Putting ${filename} to ${JSON.stringify({ Bucket, Key, ContentType })}}`);
-  const s3Client = new S3Client({});
+  const s3Client = this.getClient();
 
   const command = new PutObjectCommand({
     Bucket, Key, Body, ContentType,
@@ -166,7 +169,7 @@ Worker.prototype.write = async function (options) {
   const Body = content;
 
   debug(`Writing content of length ${content.length} to ${JSON.stringify({ Bucket, Key })}}`);
-  const s3Client = new S3Client({});
+  const s3Client = this.getClient();
   const ContentType = mime.lookup(file);
 
   const command = new PutObjectCommand({
@@ -188,7 +191,7 @@ Worker.prototype.list = async function ({ directory }) {
   let dir = directory;
   while (dir.slice(-1) === '/') dir = dir.slice(0, -1);
   const { Bucket, Key: Prefix } = getParts(dir);
-  const s3Client = new S3Client({});
+  const s3Client = this.getClient();
   const command = new ListObjectsV2Command({
     Bucket,
     Prefix: `${Prefix}/`,
@@ -248,7 +251,7 @@ Worker.prototype.listAll.metadata = {
 Worker.prototype.stat = async function ({ filename }) {
   if (!filename) throw new Error('filename is required');
 
-  const s3Client = new S3Client({});
+  const s3Client = this.getClient();
   const { Bucket, Key } = getParts(filename);
   const command = new HeadObjectCommand({ Bucket, Key });
   const response = await s3Client.send(command);
