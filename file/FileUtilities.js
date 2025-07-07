@@ -661,7 +661,12 @@ Worker.prototype.move = async function ({ filename, target }) {
       throw new Error('Cowardly not copying between services');
     }
 
-    const worker = new (filename.startsWith('r2://') ? R2Worker : S3Worker)(this);
+    let worker = null;
+    if (target.startsWith('r2://')) {
+      worker = new R2Worker(this);
+    } else {
+      worker = new S3Worker(this);
+    }
 
     if (filename.startsWith('s3://') || filename.startsWith('r2://')) {
       // We need to copy and delete
