@@ -824,6 +824,8 @@ Worker.prototype.getUniqueSet = async function (options) {
 };
 
 Worker.prototype.getUniqueStream = async function (options) {
+  const includeDuplicateSourceRecords = bool(options.includeDuplicateSourceRecords, false);
+
   const { uniqueSet, uniqueFunction, sample } = await this.getUniqueSet({
     filenames: options.existingFiles,
     uniqueFunction: options.uniqueFunction,
@@ -844,7 +846,10 @@ Worker.prototype.getUniqueStream = async function (options) {
           // do nothing
           cb();
         } else {
-          uniqueSet.add(v);
+          if (!includeDuplicateSourceRecords) {
+            // add it to the set for the next time
+            uniqueSet.add(v);
+          }
           cb(null, d);
         }
       },
@@ -857,8 +862,11 @@ Worker.prototype.getUniqueStream.metadata = {
   options: {
     existingFiles: {},
     uniqueFunction: {},
-    filename: {},
-    stream: {},
+    filename: { description: 'Specify a source filename or a stream' },
+    stream: { description: 'Specify a source filename or a stream' },
+    includeDuplicateSourceRecords: {
+      description: 'Sometimes you want the output to include source dupes, sometimes not, default false',
+    },
   },
 };
 Worker.prototype.getUniqueFile = async function (options) {
@@ -871,8 +879,11 @@ Worker.prototype.getUniqueFile.metadata = {
   options: {
     existingFiles: {},
     uniqueFunction: {},
-    filename: {},
-    stream: {},
+    filename: { description: 'Specify a source filename or a stream' },
+    stream: { description: 'Specify a source filename or a stream' },
+    includeDuplicateSourceRecords: {
+      description: 'Sometimes you want the output to include source dupes, sometimes not, default false',
+    },
   },
 };
 
@@ -882,7 +893,7 @@ Requires 2 passes of the files,
 but that's a better tradeoff than trying to store huge files in memory
 */
 Worker.prototype.diff = async function ({
-  fileA, fileB, uniqueFunction: ufOpt, fields,
+  fileA, fileB, uniqueFunction: ufOpt, fields, includeDuplicateSourceRecords,
 }) {
   if (ufOpt && fields) throw new Error('fields and uniqueFunction cannot both be specified');
   let uniqueFunction = ufOpt;
@@ -891,17 +902,19 @@ Worker.prototype.diff = async function ({
     uniqueFunction = (o) => farr.map((f) => o[f] || '').join('.');
   }
 
-  const right = await this.getUniqueFile({
-    existingFiles: [fileA],
-    filename: fileB,
-    uniqueFunction,
-  });
-
   const left = await this.getUniqueFile({
     existingFiles: [fileB],
     filename: fileA,
     uniqueFunction,
+    includeDuplicateSourceRecords,
   });
+  const right = await this.getUniqueFile({
+    existingFiles: [fileA],
+    filename: fileB,
+    uniqueFunction,
+    includeDuplicateSourceRecords,
+  });
+
   return {
     left, right,
   };
@@ -912,6 +925,9 @@ Worker.prototype.diff.metadata = {
     fileB: {},
     fields: { description: 'Fields to use for uniqueness -- aka primary key.  Defaults to JSON of line' },
     uniqueFunction: {},
+    includeDuplicateSourceRecords: {
+      description: 'Sometimes you want the output to include source dupes, sometimes not, default false',
+    },
   },
 };
 
