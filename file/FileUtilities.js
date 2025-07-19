@@ -885,9 +885,8 @@ Worker.prototype.diff = async function ({
   fileA, fileB, uniqueFunction: ufOpt, fields,
 }) {
   if (ufOpt && fields) throw new Error('fields and uniqueFunction cannot both be specified');
-  if (!ufOpt && !fields) throw new Error('Either fields or uniqueFunction must be specified');
   let uniqueFunction = ufOpt;
-  if (!uniqueFunction) {
+  if (!uniqueFunction && fields) {
     const farr = getStringArray(fields);
     uniqueFunction = (o) => farr.map((f) => o[f] || '').join('.');
   }
@@ -906,6 +905,14 @@ Worker.prototype.diff = async function ({
   return {
     left, right,
   };
+};
+Worker.prototype.diff.metadata = {
+  options: {
+    fileA: {},
+    fileB: {},
+    fields: { description: 'Fields to use for uniqueness -- aka primary key.  Defaults to JSON of line' },
+    uniqueFunction: {},
+  },
 };
 
 module.exports = Worker;
