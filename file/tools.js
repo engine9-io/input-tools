@@ -222,16 +222,38 @@ function bool(x, _defaultVal) {
   const y = x.toLowerCase();
   return !!(y.indexOf('y') + 1) || !!(y.indexOf('t') + 1);
 }
+function getStringArray(s, nonZeroLength) {
+  let a = s || [];
+  if (typeof a === 'number') a = String(a);
+  if (typeof a === 'string') a = [a];
+
+  if (typeof s === 'string') a = s.split(',');
+  a = a.map((x) => x.toString().trim()).filter(Boolean);
+  if (nonZeroLength && a.length === 0) a = [0];
+  return a;
+}
+/*
+  When comparing two objects, some may come from a file (thus strings), and some from
+  a database or elsewhere (not strings), so for deduping make sure to make them all strings
+*/
+function makeStrings(o) {
+  return Object.entries(o).reduce((a, [k, v]) => {
+    a[k] = (typeof v === 'object') ? JSON.stringify(v) : String(v);
+    return a;
+  }, {});
+}
 
 module.exports = {
   bool,
+  downloadFile,
   getTempFilename,
   getTempDir,
-  downloadFile,
   getBatchTransform,
   getDebatchTransform,
   getFile,
   getManifest,
   getPacketFiles,
+  getStringArray,
+  makeStrings,
   streamPacket,
 };

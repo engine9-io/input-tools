@@ -25,6 +25,8 @@ const {
   getPacketFiles,
   getBatchTransform,
   getDebatchTransform,
+  getStringArray,
+  makeStrings,
 } = require('./file/tools');
 
 const ForEachEntry = require('./ForEachEntry');
@@ -46,17 +48,6 @@ handlebars.registerHelper('date', (d, f) => {
 handlebars.registerHelper('json', (d) => JSON.stringify(d));
 
 handlebars.registerHelper('percent', (a, b) => `${((100 * a) / b).toFixed(2)}%`);
-
-function getStringArray(s, nonZeroLength) {
-  let a = s || [];
-  if (typeof a === 'number') a = String(a);
-  if (typeof a === 'string') a = [a];
-
-  if (typeof s === 'string') a = s.split(',');
-  a = a.map((x) => x.toString().trim()).filter(Boolean);
-  if (nonZeroLength && a.length === 0) a = [0];
-  return a;
-}
 
 function isValidDate(d) {
   // we WANT to use isNaN, not the Number.isNaN -- we're checking the date type
@@ -123,17 +114,6 @@ function relativeDate(s, _initialDate) {
   r = dayjs(new Date(s)).toDate();
   if (!isValidDate(r)) throw new Error(`Invalid Date: ${s}`);
   return r;
-}
-
-/*
-  When comparing two objects, some may come from a file (thus strings), and some from
-  a database or elsewhere (not strings), so for deduping make sure to make them all strings
-*/
-function makeStrings(o) {
-  return Object.entries(o).reduce((a, [k, v]) => {
-    a[k] = (typeof v === 'object') ? JSON.stringify(v) : String(v);
-    return a;
-  }, {});
 }
 
 async function list(_path) {

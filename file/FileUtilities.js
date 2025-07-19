@@ -5,22 +5,23 @@ const fsp = fs.promises;
 const path = require('node:path');
 const zlib = require('node:zlib');
 const {
-  Readable, Transform, PassThrough,
+  Readable, Transform, PassThrough, Writable,
 } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const { stringify } = require('csv');
 
 const debug = require('debug')('FileWorker');
-// const through2 = require('through2');
+
 const csv = require('csv');
-const JSON5 = require('json5');// Useful for parsing extended JSON
+const JSON5 = require('json5');
 const languageEncoding = require('detect-file-encoding-and-language');
 const R2Worker = require('./R2');
 const S3Worker = require('./S3');
 const ParquetWorker = require('./Parquet');
-const { streamPacket } = require('./tools');
 
-const { bool, getTempDir } = require('./tools');
+const {
+  bool, getStringArray, getTempDir, makeStrings, streamPacket,
+} = require('./tools');
 
 function Worker({ accountId }) { this.accountId = accountId; }
 
@@ -543,6 +544,15 @@ Worker.prototype.sample.metadata = {
 
   },
 };
+Worker.prototype.toArray = async function (opts) {
+  const { stream } = await this.fileToObjectStream(opts);
+  return stream.toArray();
+};
+Worker.prototype.toArray.metadata = {
+  options: {
+    filename: {},
+  },
+};
 
 Worker.prototype.write = async function (opts) {
   const { filename, content } = opts;
@@ -772,6 +782,130 @@ Worker.prototype.count.metadata = {
   options: {
     filename: { required: true },
   },
+};
+
+// Get a set of unique entries from a uniqueFunction
+// This could be large
+Worker.prototype.getUniqueSet = async function (options) {
+  const existingFiles = getStringArray(options.filenames);
+  const sample = {};
+
+  let { uniqueFunction } = options;
+  if (!uniqueFunction) {
+    uniqueFunction = ((o) => JSON.stringify(o));
+  }
+  const uniqueSet = new Set();
+  // eslint-disable-next-line no-restricted-syntax, guard-for-in
+  for (const filename of existingFiles) {
+    const { stream: existsStream } = await this.fileToObjectStream({ filename });
+    await pipeline(
+      existsStream,
+      new Transform({
+        objectMode: true,
+        transform(d, enc, cb) {
+          const v = uniqueFunction(makeStrings(d)) || '';
+          if (uniqueSet.size < 3) {
+            sample[v] = d;
+          }
+          uniqueSet.add(v);
+          cb(null, d);
+        },
+      }),
+      new Writable({
+        objectMode: true,
+        write(d, enc, cb) {
+          cb();
+        },
+      }),
+    );
+    debug(`Finished loading ${filename}`);
+  }
+  return { uniqueFunction, uniqueSet, sample };
+};
+
+Worker.prototype.getUniqueStream = async function (options) {
+  const { uniqueSet, uniqueFunction, sample } = await this.getUniqueSet({
+    filenames: options.existingFiles,
+    uniqueFunction: options.uniqueFunction,
+  });
+
+  const { stream: inStream } = await this.fileToObjectStream(options);
+  const uniqueStream = inStream.pipe(
+    new Transform({
+      objectMode: true,
+      transform(d, enc, cb) {
+        const v = uniqueFunction(makeStrings(d)) || '';
+
+        if (!v) {
+          // falsey unique function includes
+          // by default
+          cb(null, d);
+        } else if (uniqueSet.has(v)) {
+          // do nothing
+          cb();
+        } else {
+          uniqueSet.add(v);
+          cb(null, d);
+        }
+      },
+    }),
+  );
+  return { stream: uniqueStream, sample };
+};
+
+Worker.prototype.getUniqueStream.metadata = {
+  options: {
+    existingFiles: {},
+    uniqueFunction: {},
+    filename: {},
+    stream: {},
+  },
+};
+Worker.prototype.getUniqueFile = async function (options) {
+  const { stream, sample } = await this.getUniqueStream(options);
+  const { filename, records } = await this.objectStreamToFile({ stream });
+  return { filename, records, sample };
+};
+
+Worker.prototype.getUniqueFile.metadata = {
+  options: {
+    existingFiles: {},
+    uniqueFunction: {},
+    filename: {},
+    stream: {},
+  },
+};
+
+/*
+diff that allows for unordered files, and doesn't store full objects in memory.
+Requires 2 passes of the files,
+but that's a better tradeoff than trying to store huge files in memory
+*/
+Worker.prototype.diff = async function ({
+  fileA, fileB, uniqueFunction: ufOpt, fields,
+}) {
+  if (ufOpt && fields) throw new Error('fields and uniqueFunction cannot both be specified');
+  if (!ufOpt && !fields) throw new Error('Either fields or uniqueFunction must be specified');
+  let uniqueFunction = ufOpt;
+  if (!uniqueFunction) {
+    const farr = getStringArray(fields);
+    uniqueFunction = (o) => farr.map((f) => o[f] || '').join('.');
+  }
+
+  const right = await this.getUniqueFile({
+    existingFiles: [fileA],
+    filename: fileB,
+    uniqueFunction,
+  });
+
+  const left = await this.getUniqueFile({
+    existingFiles: [fileB],
+    filename: fileA,
+    uniqueFunction,
+  });
+  return {
+    left, right,
+  };
 };
 
 module.exports = Worker;
