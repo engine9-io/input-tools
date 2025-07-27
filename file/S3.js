@@ -187,7 +187,7 @@ Worker.prototype.write.metadata = {
   },
 };
 
-Worker.prototype.list = async function ({ directory }) {
+Worker.prototype.list = async function ({ directory, raw }) {
   if (!directory) throw new Error('directory is required');
   let dir = directory;
   while (dir.slice(-1) === '/') dir = dir.slice(0, -1);
@@ -200,14 +200,17 @@ Worker.prototype.list = async function ({ directory }) {
   });
 
   const { Contents: files, CommonPrefixes } = await s3Client.send(command);
+  if (raw) return files;
   // debug('Prefixes:', { CommonPrefixes });
   const output = [].concat((CommonPrefixes || []).map((f) => ({
     name: f.Prefix.slice(Prefix.length + 1, -1),
     type: 'directory',
   })))
-    .concat((files || []).map(({ Key }) => ({
+    .concat((files || []).map(({ Key, Size, LastModified }) => ({
       name: Key.slice(Prefix.length + 1),
       type: 'file',
+      size: Size,
+      modifiedAt: new Date(LastModified).toISOString(),
     })));
 
   return output;
