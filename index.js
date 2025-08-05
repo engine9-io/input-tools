@@ -49,6 +49,8 @@ handlebars.registerHelper('json', (d) => JSON.stringify(d));
 
 handlebars.registerHelper('percent', (a, b) => `${((100 * a) / b).toFixed(2)}%`);
 
+handlebars.registerHelper('or', (a, b, c) => a || b || c);
+
 function isValidDate(d) {
   // we WANT to use isNaN, not the Number.isNaN -- we're checking the date type
   // eslint-disable-next-line no-restricted-globals
