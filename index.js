@@ -47,6 +47,8 @@ handlebars.registerHelper('date', (d, f) => {
 });
 handlebars.registerHelper('json', (d) => JSON.stringify(d));
 
+handlebars.registerHelper('uuid', () => uuidv7());
+
 handlebars.registerHelper('percent', (a, b) => `${((100 * a) / b).toFixed(2)}%`);
 
 handlebars.registerHelper('or', (a, b, c) => a || b || c);
