@@ -65,7 +65,7 @@ async function getTempFilename(options) {
 }
 
 async function writeTempFile(options) {
-  const { content, postfix = '.txt' } = await this.getHTML(options);
+  const { content, postfix = '.txt' } = options;
   const filename = await getTempFilename({ ...options, postfix });
 
   await fsp.writeFile(filename, content);
