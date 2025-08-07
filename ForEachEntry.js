@@ -30,7 +30,7 @@ class ForEachEntry {
   getTimelineOutputStream() {
     return this.timelineOutputMutex.runExclusive(async () => {
       if (this.outputStream) return this.outputStream;
-      const timelineFile = await getTempFilename({ postfix: '.csv' });
+      const timelineFile = await getTempFilename({ postfix: '.timeline.csv' });
       debug(`Timeline output requested, writing timeline file to: ${timelineFile}`);
       const timelineOutputStream = new ValidatingReadable({
         objectMode: true,
