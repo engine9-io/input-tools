@@ -27,6 +27,7 @@ const {
   getDebatchTransform,
   getStringArray,
   makeStrings,
+  writeTempFile,
 } = require('./file/tools');
 
 const ForEachEntry = require('./ForEachEntry');
@@ -399,6 +400,7 @@ module.exports = {
   relativeDate,
   streamPacket,
   TIMELINE_ENTRY_TYPES,
+  writeTempFile,
   uuidIsValid,
   uuidv4,
   uuidv5,

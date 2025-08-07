@@ -64,6 +64,14 @@ async function getTempFilename(options) {
   return p;
 }
 
+async function writeTempFile(options) {
+  const { content, postfix = '.txt' } = await this.getHTML(options);
+  const filename = await getTempFilename({ ...options, postfix });
+
+  await fsp.writeFile(filename, content);
+  return { filename };
+}
+
 const {
   S3Client,
   HeadObjectCommand,
@@ -256,4 +264,5 @@ module.exports = {
   getStringArray,
   makeStrings,
   streamPacket,
+  writeTempFile,
 };
