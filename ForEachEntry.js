@@ -150,6 +150,7 @@ class ForEachEntry {
     debug('Completed all batches');
 
     newStreams.forEach((s) => s.push(null));
+    await Promise.all(bindingPromises);
 
     return { timelineFiles };
   }
