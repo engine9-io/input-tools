@@ -1,6 +1,6 @@
 {
   "name": "@engine9-io/input-tools",
-  "version": "1.7.3",
+  "version": "1.7.4",
   "description": "Tools for dealing with Engine9 inputs",
   "main": "index.js",
   "scripts": {

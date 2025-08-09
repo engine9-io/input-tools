@@ -67,7 +67,7 @@ class ForEachEntry {
           objectMode: true,
           transform(o, enc, cb) {
             fileInfo.records += 1;
-            cb();
+            cb(null, o);
           },
         }))
         .pipe(csv.stringify({ header: true }))
