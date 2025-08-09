@@ -117,7 +117,7 @@ class ForEachEntry {
       if (binding.path === 'output.timeline') {
         const { stream: streamImpl, promises, files } = await this.getOutputStream({
           name: bindingName,
-          postfix: '.timeline.csv',
+          postfix: binding.options?.postfix || '.timeline.csv',
           validatorFunction: (data) => {
             if (!data) return true;
             if (typeof data !== 'object') throw new Error('Invalid timeline data push, must be an object');
@@ -134,7 +134,7 @@ class ForEachEntry {
       } else if (binding.path === 'output.stream') {
         const { stream: streamImpl, promises, files } = await this.getOutputStream({
           name: bindingName,
-          postfix: '.output.csv',
+          postfix: binding.options?.postfix || '.timeline.csv',
         });
         newStreams.push(streamImpl);
         transformArguments[bindingName] = streamImpl;
