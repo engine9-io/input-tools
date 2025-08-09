@@ -23,30 +23,28 @@ const {
 
 class ForEachEntry {
   constructor({ accountId } = {}) {
-    this.timelineOutputMutex = new Mutex();
     this.fileUtilities = new FileUtilities({ accountId });
   }
 
-  getTimelineOutputStream() {
-    return this.timelineOutputMutex.runExclusive(async () => {
-      if (this.outputStream) return this.outputStream;
-      const timelineFile = await getTempFilename({ postfix: '.timeline.csv' });
-      debug(`Timeline output requested, writing timeline file to: ${timelineFile}`);
-      const timelineOutputStream = new ValidatingReadable({
-        objectMode: true,
-      }, (data) => {
-        if (!data) return true;
-        if (typeof data !== 'object') throw new Error('Invalid timeline data push, must be an object');
-        // Is this necessary?
-        if (!data.person_id) throw new Error('Invalid timeline data push, must have a person_id, even if 0');
-        if (!data.ts) data.ts = new Date().toISOString();
-        return true;
-      });
-      // eslint-disable-next-line no-underscore-dangle
-      timelineOutputStream._read = () => {};
+  getOutputStream({ name, postfix = '.timeline.csv', validatorFunction = () => true }) {
+    this.outputStreams = this.outputStreams || {};
+    if (this.outputStreams[name]?.items) return this.outputStreams[name].items;
 
-      const writeStream = fs.createWriteStream(timelineFile);
-      const finishWritingTimelinePromise = new Promise((resolve, reject) => {
+    this.outputStreams[name] = this.outputStreams[name] || {
+      mutex: new Mutex(),
+    };
+
+    return this.outputStreams[name].mutex.runExclusive(async () => {
+      const outputFile = await getTempFilename({ postfix });
+      debug(`Output file requested, writing output to to: ${outputFile}`);
+      const outputStream = new ValidatingReadable({
+        objectMode: true,
+      }, validatorFunction);
+      // eslint-disable-next-line no-underscore-dangle
+      outputStream._read = () => {};
+
+      const writeStream = fs.createWriteStream(outputFile);
+      const finishWritingOutputPromise = new Promise((resolve, reject) => {
         writeStream.on('finish', () => {
           resolve();
         }).on('error', (err) => {
@@ -54,16 +52,16 @@ class ForEachEntry {
         });
       });
 
-      timelineOutputStream
+      outputStream
         .pipe(csv.stringify({ header: true }))
         .pipe(writeStream);
 
-      this.outputStream = {
-        stream: timelineOutputStream,
-        promises: [finishWritingTimelinePromise],
-        files: [timelineFile],
+      this.outputStreams[name].items = {
+        stream: outputStream,
+        promises: [finishWritingOutputPromise],
+        files: [outputFile],
       };
-      return this.outputStream;
+      return this.outputStreams[name].items;
     });
   }
 
@@ -90,7 +88,7 @@ class ForEachEntry {
     let records = 0;
     let batches = 0;
 
-    let timelineFiles = [];
+    const outputFiles = {};
 
     const transformArguments = {};
     // An array of promises that must be completed, such as writing to disk
@@ -105,11 +103,31 @@ class ForEachEntry {
       const binding = bindings[bindingName];
       if (!binding.path) throw new Error(`Invalid binding: path is required for binding ${bindingName}`);
       if (binding.path === 'output.timeline') {
-        const { stream: streamImpl, promises, files } = await this.getTimelineOutputStream({});
+        const { stream: streamImpl, promises, files } = await this.getOutputStream({
+          name: bindingName,
+          postfix: '.timeline.csv',
+          validatorFunction: (data) => {
+            if (!data) return true;
+            if (typeof data !== 'object') throw new Error('Invalid timeline data push, must be an object');
+            // Is this necessary?
+            if (!data.person_id) throw new Error('Invalid timeline data push, must have a person_id, even if 0');
+            if (!data.ts) data.ts = new Date().toISOString();
+            return true;
+          },
+        });
         newStreams.push(streamImpl);
         transformArguments[bindingName] = streamImpl;
         bindingPromises = bindingPromises.concat(promises || []);
-        timelineFiles = timelineFiles.concat(files);
+        outputFiles[bindingName] = files;
+      } else if (binding.path === 'output.stream') {
+        const { stream: streamImpl, promises, files } = await this.getOutputStream({
+          name: bindingName,
+          postfix: '.output.csv',
+        });
+        newStreams.push(streamImpl);
+        transformArguments[bindingName] = streamImpl;
+        bindingPromises = bindingPromises.concat(promises || []);
+        outputFiles[bindingName] = files;
       } else if (binding.path === 'file') {
         transformArguments[bindingName] = await getFile(binding);
       } else if (binding.path === 'handlebars') {
@@ -152,7 +170,7 @@ class ForEachEntry {
     newStreams.forEach((s) => s.push(null));
     await Promise.all(bindingPromises);
 
-    return { timelineFiles };
+    return { outputFiles };
   }
 }
 

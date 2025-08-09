@@ -10,41 +10,53 @@ describe('Test Person Packet For Each', async () => {
   it('forEachPerson Should loop through 1000 sample people', async () => {
     let counter = 0;
     const forEach = new ForEachEntry();
-    await forEach.process(
+    const result = await forEach.process(
       {
         packet: 'test/sample/1000_message.packet.zip',
         batchSize: 50,
         bindings: {
-          timelineOutputStream: {
+          timelineOutputFileStream: {
             path: 'output.timeline',
             options: {
-              entry_type: 'SAMPLE',
+              entry_type: 'ENTRY_OPTION',
             },
+          },
+          sampleOutputFileStream: {
+            path: 'output.stream',
           },
         },
         async transform(props) {
           const {
             batch,
-            timelineOutputStream,
+            timelineOutputFileStream,
+            sampleOutputFileStream,
           } = props;
-          if (timelineOutputStream) {
-            batch.forEach((p) => {
-              timelineOutputStream.push(
-                {
-                  // for testing we don't need real person_ids
-                  person_id: p.person_id || Math.floor(Math.random() * 1000000),
-                  email: p.email,
-                  entry_type: 'EMAIL_DELIVERED',
-                },
-              );
-            });
-          } else {
-            throw new Error(`output.timeline did not put a timelineOutputStream into the bindings:${Object.keys(props)}`);
-          }
+
+          batch.forEach((p) => {
+            if (Math.random() > 0.9) {
+              sampleOutputFileStream.push({
+                // for testing we don't need real person_ids
+                person_id: p.person_id || Math.floor(Math.random() * 1000000),
+                email: p.email,
+                entry_type: 'SAMPLE_OUTPUT',
+              });
+            }
+            timelineOutputFileStream.push(
+              {
+                // for testing we don't need real person_ids
+                person_id: p.person_id || Math.floor(Math.random() * 1000000),
+                email: p.email,
+                entry_type: 'EMAIL_DELIVERED',
+              },
+            );
+          });
+
           batch.forEach(() => { counter += 1; });
         },
       },
     );
+    assert(result.outputFiles?.timelineOutputFileStream?.length);
+    assert(result.outputFiles?.sampleOutputFileStream?.length);
     assert.equal(counter, 1000, `Expected to loop through 1000 people, actual:${counter}`);
   });
   debug('Completed tests');
