@@ -663,8 +663,33 @@ Worker.prototype.empty.metadata = {
   },
 };
 
+Worker.prototype.remove = async function ({ filename }) {
+  if (!filename) throw new Error('filename is required');
+  if (typeof filename !== 'string') throw new Error(`filename isn't a string:${JSON.stringify(filename)}`);
+  if (filename.startsWith('s3://') || filename.startsWith('r2://')) {
+    let worker = null;
+    if (filename.startsWith('r2://')) {
+      worker = new R2Worker(this);
+    } else {
+      worker = new S3Worker(this);
+    }
+
+    await worker.remove({ filename });
+  } else {
+    fsp.unlink(filename);
+  }
+
+  return { removed: filename };
+};
+Worker.prototype.remove.metadata = {
+  options: {
+    filename: {},
+  },
+};
+
 Worker.prototype.move = async function ({ filename, target }) {
   if (!target) throw new Error('target is required');
+  if (typeof target !== 'string') throw new Error(`target isn't a string:${JSON.stringify(target)}`);
   if (target.startsWith('s3://') || target.startsWith('r2://')) {
     if ((target.startsWith('s3://') && filename.startsWith('r2://'))
       || (target.startsWith('r2://') && filename.startsWith('s3://'))) {
