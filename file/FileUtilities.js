@@ -190,7 +190,6 @@ Worker.prototype.fileToObjectStream = async function (options) {
 
   debug(`Reading file ${filename} with encoding:`, encoding);
 
-  const head = null;
   let transforms = [];
 
   if (postfix === 'gz') {
@@ -270,13 +269,14 @@ Worker.prototype.fileToObjectStream = async function (options) {
     },
     flush(cb) {
       // If there's no records at all, push a dummy record, and specify 0 records
+      // Don't push dummy records anymore -- legacy cruft
       debug(`Completed reading file, records=${count}`);
-      if (count === 0) {
+      /* if (count === 0) {
         const o = { _is_placeholder: true };
 
         if (head) head.forEach((c) => { o[c] = null; });
         this.push(o);
-      }
+      } */
       cb();
     },
   });
