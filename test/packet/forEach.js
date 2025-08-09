@@ -55,8 +55,8 @@ describe('Test Person Packet For Each', async () => {
         },
       },
     );
-    assert(result.outputFiles?.timelineOutputFileStream?.length);
-    assert(result.outputFiles?.sampleOutputFileStream?.length);
+    assert(result.outputFiles?.timelineOutputFileStream?.[0]?.records);
+    assert(result.outputFiles?.sampleOutputFileStream?.[0]?.records);
     assert.equal(counter, 1000, `Expected to loop through 1000 people, actual:${counter}`);
   });
   debug('Completed tests');

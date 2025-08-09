@@ -1,6 +1,6 @@
 const fs = require('node:fs');
 
-const { Writable } = require('node:stream');
+const { Transform, Writable } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const { throttle } = require('throttle-debounce');
 const parallelTransform = require('parallel-transform');
@@ -35,15 +35,19 @@ class ForEachEntry {
     };
 
     return this.outputStreams[name].mutex.runExclusive(async () => {
-      const outputFile = await getTempFilename({ postfix });
-      debug(`Output file requested, writing output to to: ${outputFile}`);
+      const fileInfo = {
+        filename: await getTempFilename({ postfix }),
+        records: 0,
+      };
+
+      debug(`Output file requested, writing output to to: ${fileInfo.filename}`);
       const outputStream = new ValidatingReadable({
         objectMode: true,
       }, validatorFunction);
       // eslint-disable-next-line no-underscore-dangle
       outputStream._read = () => {};
 
-      const writeStream = fs.createWriteStream(outputFile);
+      const writeStream = fs.createWriteStream(fileInfo.filename);
       const finishWritingOutputPromise = new Promise((resolve, reject) => {
         writeStream.on('finish', () => {
           resolve();
@@ -52,15 +56,23 @@ class ForEachEntry {
         });
       });
 
-      outputStream
-        .pipe(csv.stringify({ header: true }))
-        .pipe(writeStream);
-
       this.outputStreams[name].items = {
         stream: outputStream,
         promises: [finishWritingOutputPromise],
-        files: [outputFile],
+        files: [fileInfo],
       };
+
+      outputStream
+        .pipe(new Transform({
+          objectMode: true,
+          transform(o, enc, cb) {
+            fileInfo.records += 1;
+            cb();
+          },
+        }))
+        .pipe(csv.stringify({ header: true }))
+        .pipe(writeStream);
+
       return this.outputStreams[name].items;
     });
   }
