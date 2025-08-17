@@ -1,6 +1,5 @@
 const debug = require('debug')('@engine9-io/input/S3');
 const fs = require('node:fs');
-// eslint-disable-next-line import/no-unresolved
 const { mimeType: mime } = require('mime-type/with-db');
 const {
   S3Client,
@@ -187,7 +186,7 @@ Worker.prototype.write.metadata = {
   },
 };
 
-Worker.prototype.list = async function ({ directory, raw }) {
+Worker.prototype.list = async function ({ directory, start,end,raw }) {
   if (!directory) throw new Error('directory is required');
   let dir = directory;
   while (dir.slice(-1) === '/') dir = dir.slice(0, -1);
@@ -206,7 +205,16 @@ Worker.prototype.list = async function ({ directory, raw }) {
     name: f.Prefix.slice(Prefix.length + 1, -1),
     type: 'directory',
   })))
-    .concat((files || []).map(({ Key, Size, LastModified }) => ({
+    .concat((files || [])
+    .filter(({LastModified})=>{
+      if (start && new Date(LastModified)<start){
+        return false;
+      }else if (end && new Date(LastModified)>end){
+        return false;
+      }else{
+        return true;
+      }
+    }).map(({ Key, Size, LastModified }) => ({
       name: Key.slice(Prefix.length + 1),
       type: 'file',
       size: Size,

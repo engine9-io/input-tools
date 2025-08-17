@@ -12,6 +12,15 @@ const { PassThrough } = require('node:stream');
 const progress = require('debug')('info:@engine9/input-tools');
 const unzipper = require('unzipper');
 
+const dayjs = require('dayjs');
+
+const {
+  S3Client,
+  HeadObjectCommand,
+  GetObjectCommand,
+} = require('@aws-sdk/client-s3');
+
+
 const {
   v7: uuidv7,
 } = require('uuid');
@@ -72,12 +81,6 @@ async function writeTempFile(options) {
   return { filename };
 }
 
-const {
-  S3Client,
-  HeadObjectCommand,
-  GetObjectCommand,
-} = require('@aws-sdk/client-s3');
-
 async function getPacketFiles({ packet }) {
   if (packet.indexOf('s3://') === 0) {
     const parts = packet.split('/');
@@ -127,6 +130,7 @@ async function getPacketFiles({ packet }) {
   const directory = await unzipper.Open.file(packet);
   return directory;
 }
+
 
 async function getManifest({ packet }) {
   if (!packet) throw new Error('no packet option specififed');
@@ -222,6 +226,12 @@ async function downloadFile({ packet, type = 'person' }) {
   });
 }
 
+function isValidDate(d) {
+  // we WANT to use isNaN, not the Number.isNaN -- we're checking the date type
+  // eslint-disable-next-line no-restricted-globals
+  return d instanceof Date && !isNaN(d);
+}
+
 function bool(x, _defaultVal) {
   const defaultVal = (_defaultVal === undefined) ? false : _defaultVal;
   if (x === undefined || x === null || x === '') return defaultVal;
@@ -240,6 +250,67 @@ function getStringArray(s, nonZeroLength) {
   if (nonZeroLength && a.length === 0) a = [0];
   return a;
 }
+function relativeDate(s, _initialDate) {
+  let initialDate = _initialDate;
+  if (!s || s === 'none') return null;
+  if (typeof s.getMonth === 'function') return s;
+  // We actually want a double equals here to test strings as well
+  // eslint-disable-next-line eqeqeq
+  if (parseInt(s, 10) == s) {
+    const r = new Date(parseInt(s, 10));
+    if (!isValidDate(r)) throw new Error(`Invalid integer date:${s}`);
+    return r;
+  }
+
+  if (initialDate) {
+    initialDate = new Date(initialDate);
+  } else {
+    initialDate = new Date();
+  }
+
+  let r = s.match(/^([+-]{1})([0-9]+)([YyMwdhms]{1})([.a-z]*)$/);
+
+  if (r) {
+    let period = null;
+    switch (r[3]) {
+      case 'Y':
+      case 'y': period = 'years'; break;
+
+      case 'M': period = 'months'; break;
+      case 'w': period = 'weeks'; break;
+      case 'd': period = 'days'; break;
+      case 'h': period = 'hours'; break;
+      case 'm': period = 'minutes'; break;
+      case 's': period = 'seconds'; break;
+      default: period = 'minutes'; break;
+    }
+
+    let d = dayjs(initialDate);
+
+    if (r[1] === '+') {
+      d = d.add(parseInt(r[2], 10), period);
+    } else {
+      d = d.subtract(parseInt(r[2], 10), period);
+    }
+    if (!isValidDate(d.toDate())) throw new Error(`Invalid date configuration:${r}`);
+    if (r[4]) {
+      const opts = r[4].split('.').filter(Boolean);
+      if (opts[0] === 'start') d = d.startOf(opts[1] || 'day');
+      else if (opts[0] === 'end') d = d.endOf(opts[1] || 'day');
+      else throw new Error(`Invalid relative date,unknown options:${r[4]}`);
+    }
+
+    return d.toDate();
+  }
+  if (s === 'now') {
+    r = dayjs(new Date()).toDate();
+    return r;
+  }
+  r = dayjs(new Date(s)).toDate();
+  if (!isValidDate(r)) throw new Error(`Invalid Date: ${s}`);
+  return r;
+}
+
 /*
   When comparing two objects, some may come from a file (thus strings), and some from
   a database or elsewhere (not strings), so for deduping make sure to make them all strings
@@ -263,6 +334,7 @@ module.exports = {
   getPacketFiles,
   getStringArray,
   makeStrings,
+  relativeDate,
   streamPacket,
   writeTempFile,
 };

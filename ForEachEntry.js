@@ -172,7 +172,7 @@ class ForEachEntry {
           batches += 1;
           records += batch?.length || 0;
 
-          debugThrottle(`Processed ${batches} batches for a total of ${records} records`);
+          debugThrottle(`Processed ${batches} batches for a total of ${records} outbound records`);
           cb();
         },
       }),

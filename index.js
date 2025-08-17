@@ -21,6 +21,8 @@ const {
   downloadFile,
   getTempFilename,
   getTempDir,
+  isValidDate,
+  relativeDate,
   streamPacket,
   getPacketFiles,
   getBatchTransform,
@@ -53,73 +55,6 @@ handlebars.registerHelper('uuid', () => uuidv7());
 handlebars.registerHelper('percent', (a, b) => `${((100 * a) / b).toFixed(2)}%`);
 
 handlebars.registerHelper('or', (a, b, c) => a || b || c);
-
-function isValidDate(d) {
-  // we WANT to use isNaN, not the Number.isNaN -- we're checking the date type
-  // eslint-disable-next-line no-restricted-globals
-  return d instanceof Date && !isNaN(d);
-}
-
-function relativeDate(s, _initialDate) {
-  let initialDate = _initialDate;
-  if (!s || s === 'none') return null;
-  if (typeof s.getMonth === 'function') return s;
-  // We actually want a double equals here to test strings as well
-  // eslint-disable-next-line eqeqeq
-  if (parseInt(s, 10) == s) {
-    const r = new Date(parseInt(s, 10));
-    if (!isValidDate(r)) throw new Error(`Invalid integer date:${s}`);
-    return r;
-  }
-
-  if (initialDate) {
-    initialDate = new Date(initialDate);
-  } else {
-    initialDate = new Date();
-  }
-
-  let r = s.match(/^([+-]{1})([0-9]+)([YyMwdhms]{1})([.a-z]*)$/);
-
-  if (r) {
-    let period = null;
-    switch (r[3]) {
-      case 'Y':
-      case 'y': period = 'years'; break;
-
-      case 'M': period = 'months'; break;
-      case 'w': period = 'weeks'; break;
-      case 'd': period = 'days'; break;
-      case 'h': period = 'hours'; break;
-      case 'm': period = 'minutes'; break;
-      case 's': period = 'seconds'; break;
-      default: period = 'minutes'; break;
-    }
-
-    let d = dayjs(initialDate);
-
-    if (r[1] === '+') {
-      d = d.add(parseInt(r[2], 10), period);
-    } else {
-      d = d.subtract(parseInt(r[2], 10), period);
-    }
-    if (!isValidDate(d.toDate())) throw new Error(`Invalid date configuration:${r}`);
-    if (r[4]) {
-      const opts = r[4].split('.').filter(Boolean);
-      if (opts[0] === 'start') d = d.startOf(opts[1] || 'day');
-      else if (opts[0] === 'end') d = d.endOf(opts[1] || 'day');
-      else throw new Error(`Invalid relative date,unknown options:${r[4]}`);
-    }
-
-    return d.toDate();
-  }
-  if (s === 'now') {
-    r = dayjs(new Date()).toDate();
-    return r;
-  }
-  r = dayjs(new Date(s)).toDate();
-  if (!isValidDate(r)) throw new Error(`Invalid Date: ${s}`);
-  return r;
-}
 
 async function list(_path) {
   const directory = await unzipper.Open.file(_path);

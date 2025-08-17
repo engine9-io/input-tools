@@ -20,7 +20,7 @@ const S3Worker = require('./S3');
 const ParquetWorker = require('./Parquet');
 
 const {
-  bool, getStringArray, getTempDir, makeStrings, streamPacket,
+  bool, getStringArray, getTempDir, makeStrings, streamPacket,relativeDate
 } = require('./tools');
 
 function Worker({ accountId }) { this.accountId = accountId; }
@@ -609,17 +609,38 @@ Worker.prototype.json.metadata = {
   },
 };
 
-Worker.prototype.list = async function ({ directory }) {
+Worker.prototype.list = async function ({ directory, start:s, end:e }) {
   if (!directory) throw new Error('directory is required');
+  let start=null;
+  let end=null;
+  if (s) start=relativeDate(s);
+  if (e) end=relativeDate(e);
+  
   if (directory.startsWith('s3://') || directory.startsWith('r2://')) {
     const worker = new (directory.startsWith('r2://') ? R2Worker : S3Worker)(this);
-    return worker.list({ directory });
+    return worker.list({ directory, start, end });
   }
   const a = await fsp.readdir(directory, { withFileTypes: true });
-  return a.map((f) => ({
-    name: f.name,
-    type: f.isDirectory() ? 'directory' : 'file',
-  }));
+
+  const withModified=[];
+  for (const file of a) {
+      const fullPath = path.join(directory, file.name);
+      const stats = await fsp.stat(fullPath);
+      if (start && stats.mtime<start.getTime()){
+        //do not include
+      }else if (end && stats.mtime>end.getTime()){
+        //do nothing
+      }else{
+          withModified.push({
+            name:file.name,
+            type: file.isDirectory() ? 'directory' : 'file',
+            modifiedAt:new Date(stats.mtime).toISOString(),
+          });
+      }
+  }
+  
+  return withModified;
+  
 };
 Worker.prototype.list.metadata = {
   options: {
