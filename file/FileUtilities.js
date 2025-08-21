@@ -153,7 +153,7 @@ Worker.prototype.detectEncoding.metadata = {
 Internal method to transform a file into a stream of objects.
 */
 Worker.prototype.fileToObjectStream = async function (options) {
-  const { filename, columns, limit: limitOption } = options;
+  const { filename, columns, limit: limitOption,format:formatOverride } = options;
 
   // handle stream item
   if (options.stream) {
@@ -203,14 +203,15 @@ Worker.prototype.fileToObjectStream = async function (options) {
   } else {
     stream.setEncoding(encoding);
   }
+  let format=formatOverride || postfix;
 
-  if (postfix === 'csv') {
+  if (format === 'csv') {
     const csvTransforms = this.csvToObjectTransforms({ ...options });
     transforms = transforms.concat(csvTransforms.transforms);
-  } else if (postfix === 'txt') {
+  } else if (format === 'txt') {
     const csvTransforms = this.csvToObjectTransforms({ ...options, delimiter: '\t' });
     transforms = transforms.concat(csvTransforms.transforms);
-  } else if (postfix === 'jsonl') {
+  } else if (format === 'jsonl') {
     /* Type of JSON that has the names in an array in the first record,
     and the values in JSON arrays thereafter
     */
