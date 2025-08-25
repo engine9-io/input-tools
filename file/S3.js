@@ -12,7 +12,9 @@ const {
 } = require('@aws-sdk/client-s3');
 const { getTempFilename } = require('./tools');
 
-function Worker() {}
+function Worker() {
+  this.prefix='s3';
+}
 
 function getParts(filename) {
   if (!filename) throw new Error(`Invalid filename: ${filename}`);
@@ -247,7 +249,7 @@ Worker.prototype.listAll = async function ({ directory }) {
     debug(`Sending List command with prefix ${Prefix} with ContinuationToken ${ContinuationToken}`);
     // eslint-disable-next-line no-await-in-loop
     const result = await s3Client.send(command);
-    const newFiles = (result.Contents?.map((d) => `s3://${Bucket}/${d.Key}`) || []);
+    const newFiles = (result.Contents?.map((d) => `${this.prefix}://${Bucket}/${d.Key}`) || []);
     debug(`Retrieved ${newFiles.length} new files, total ${files.length},sample ${newFiles.slice(0, 3).join(',')}`);
     files.push(...newFiles);
     ContinuationToken = result.NextContinuationToken;

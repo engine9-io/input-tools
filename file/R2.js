@@ -6,6 +6,7 @@ const S3 = require('./S3');
 
 function R2(worker) {
   S3.call(this, worker);
+  this.prefix='r2';
 }
 util.inherits(R2, S3);
 
