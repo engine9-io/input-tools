@@ -6,15 +6,14 @@ const dayjs = require('dayjs');
 const debug = require('debug')('@engine9/input-tools');
 
 const unzipper = require('unzipper');
-const {
-  v4: uuidv4, v5: uuidv5, v7: uuidv7, validate: uuidIsValid,
-} = require('uuid');
+const { v4: uuidv4, v5: uuidv5, v7: uuidv7, validate: uuidIsValid } = require('uuid');
 const archiver = require('archiver');
 const handlebars = require('handlebars');
 
 const FileUtilities = require('./file/FileUtilities');
 
 const {
+  appendPostfix,
   bool,
   getManifest,
   getFile,
@@ -29,7 +28,7 @@ const {
   getDebatchTransform,
   getStringArray,
   makeStrings,
-  writeTempFile,
+  writeTempFile
 } = require('./file/tools');
 
 const ForEachEntry = require('./ForEachEntry');
@@ -45,7 +44,7 @@ function getFormattedDate(dateObject, format = 'MMM DD,YYYY') {
 
 handlebars.registerHelper('date', (d, f) => {
   let format;
-  if (typeof f === 'string')format = f;
+  if (typeof f === 'string') format = f;
   return getFormattedDate(d, format);
 });
 handlebars.registerHelper('json', (d) => JSON.stringify(d));
@@ -60,11 +59,7 @@ async function list(_path) {
   const directory = await unzipper.Open.file(_path);
 
   return new Promise((resolve, reject) => {
-    directory.files[0]
-      .stream()
-      .pipe(fs.createWriteStream('firstFile'))
-      .on('error', reject)
-      .on('finish', resolve);
+    directory.files[0].stream().pipe(fs.createWriteStream('firstFile')).on('error', reject).on('finish', resolve);
   });
 }
 
@@ -74,11 +69,7 @@ async function extract(_path, _file) {
   const file = directory.files.find((d) => d.path === _file);
   const tempFilename = await getTempFilename({ source: _file });
   return new Promise((resolve, reject) => {
-    file
-      .stream()
-      .pipe(fs.createWriteStream(tempFilename))
-      .on('error', reject)
-      .on('finish', resolve);
+    file.stream().pipe(fs.createWriteStream(tempFilename)).on('error', reject).on('finish', resolve);
   });
 }
 
@@ -87,7 +78,7 @@ function appendFiles(existingFiles, _newFiles, options) {
   if (newFiles.length === 0) return;
   let { type, dateCreated } = options || {};
   if (!type) type = 'unknown';
-  if (!dateCreated)dateCreated = new Date().toISOString();
+  if (!dateCreated) dateCreated = new Date().toISOString();
   let arr = newFiles;
   if (!Array.isArray(newFiles)) arr = [arr];
 
@@ -96,7 +87,7 @@ function appendFiles(existingFiles, _newFiles, options) {
       type,
       originalFilename: '',
       isNew: true,
-      dateCreated,
+      dateCreated
     };
 
     if (typeof p === 'string') {
@@ -121,7 +112,7 @@ async function create(options) {
     messageFiles = [], // file with contents of message, used for delivery
     personFiles = [], // files with data on people
     timelineFiles = [], // activity entry
-    statisticsFiles = [], // files with aggregate statistics
+    statisticsFiles = [] // files with aggregate statistics
   } = options;
   if (options.peopleFiles) throw new Error('Unknown option: peopleFiles, did you mean personFiles?');
 
@@ -132,21 +123,21 @@ async function create(options) {
   appendFiles(files, timelineFiles, { type: 'timeline', dateCreated });
   appendFiles(files, statisticsFiles, { type: 'statistics', dateCreated });
 
-  const zipFilename = target || await getTempFilename({ postfix: '.packet.zip' });
+  const zipFilename = target || (await getTempFilename({ postfix: '.packet.zip' }));
 
   const manifest = {
     accountId,
     source: {
-      pluginId,
+      pluginId
     },
     dateCreated,
-    files,
+    files
   };
 
   // create a file to stream archive data to.
   const output = fs.createWriteStream(zipFilename);
   const archive = archiver('zip', {
-    zlib: { level: 9 }, // Sets the compression level.
+    zlib: { level: 9 } // Sets the compression level.
   });
   return new Promise((resolve, reject) => {
     debug(`Setting up write stream to ${zipFilename}`);
@@ -157,7 +148,7 @@ async function create(options) {
       debug(zipFilename);
       return resolve({
         filename: zipFilename,
-        bytes: archive.pointer(),
+        bytes: archive.pointer()
       });
     });
 
@@ -196,7 +187,6 @@ function intToByteArray(_v) {
   const byteArray = [0, 0, 0, 0, 0, 0, 0, 0];
   let v = _v;
   for (let index = 0; index < byteArray.length; index += 1) {
-    // eslint-disable-next-line no-bitwise
     const byte = v & 0xff;
     byteArray[index] = byte;
     v = (v - byte) / 256;
@@ -226,23 +216,26 @@ function getInputUUID(a, b) {
   return uuidv5(`${pluginId}:${rid}`, '3d0e5d99-6ba9-4fab-9bb2-c32304d3df8e');
 }
 
-function getUUIDv7(date, inputUuid) { /* optional date and input UUID */
+function getUUIDv7(date, inputUuid) {
+  /* optional date and input UUID */
   const uuid = inputUuid || uuidv7();
   const bytes = Buffer.from(uuid.replace(/-/g, ''), 'hex');
   if (date !== undefined) {
     const d = new Date(date);
     // isNaN behaves differently than Number.isNaN -- we're actually going for the
     // attempted conversion here
-    // eslint-disable-next-line no-restricted-globals
+
     if (isNaN(d)) throw new Error(`getUUIDv7 got an invalid date:${date || '<blank>'}`);
     const dateBytes = intToByteArray(d.getTime()).reverse();
-    dateBytes.slice(2, 8).forEach((b, i) => { bytes[i] = b; });
+    dateBytes.slice(2, 8).forEach((b, i) => {
+      bytes[i] = b;
+    });
   }
   return uuidv4({ random: bytes });
 }
 /* Returns a date from a given uuid (assumed to be a v7, otherwise the results are ... weird */
 function getUUIDTimestamp(uuid) {
-  const ts = parseInt((`${uuid}`).replace(/-/g, '').slice(0, 12), 16);
+  const ts = parseInt(`${uuid}`.replace(/-/g, '').slice(0, 12), 16);
   return new Date(ts);
 }
 
@@ -266,7 +259,8 @@ function getTimelineEntryUUID(inputObject, { defaults = {} } = {}) {
 
   if (o.remote_entry_id) {
     // get a temp ID
-    if (!o.input_id) throw new Error('Error generating timeline entry uuid -- remote_entry_id specified, but no input_id');
+    if (!o.input_id)
+      throw new Error('Error generating timeline entry uuid -- remote_entry_id specified, but no input_id');
     const uuid = uuidv5(o.remote_entry_id, o.input_id);
     // Change out the ts to match the v7 sorting.
     // But because outside specified remote_entry_uuid
@@ -274,14 +268,13 @@ function getTimelineEntryUUID(inputObject, { defaults = {} } = {}) {
     return getUUIDv7(o.ts, uuid);
   }
 
-  const missing = requiredTimelineEntryFields
-    .filter((d) => o[d] === undefined);// 0 could be an entry type value
+  const missing = requiredTimelineEntryFields.filter((d) => o[d] === undefined); // 0 could be an entry type value
 
   if (missing.length > 0) throw new Error(`Missing required fields to append an entry_id:${missing.join(',')}`);
   const ts = new Date(o.ts);
   // isNaN behaves differently than Number.isNaN -- we're actually going for the
   // attempted conversion here
-  // eslint-disable-next-line no-restricted-globals
+
   if (isNaN(ts)) throw new Error(`getTimelineEntryUUID got an invalid date:${o.ts || '<blank>'}`);
   const idString = `${ts.toISOString()}-${o.person_id}-${o.entry_type_id}-${o.source_code_id || 0}`;
 
@@ -308,6 +301,7 @@ function getEntryTypeId(o, { defaults = {} } = {}) {
 }
 
 module.exports = {
+  appendPostfix,
   bool,
   create,
   list,
@@ -339,5 +333,5 @@ module.exports = {
   uuidIsValid,
   uuidv4,
   uuidv5,
-  uuidv7,
+  uuidv7
 };

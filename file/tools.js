@@ -14,16 +14,9 @@ const unzipper = require('unzipper');
 
 const dayjs = require('dayjs');
 
-const {
-  S3Client,
-  HeadObjectCommand,
-  GetObjectCommand,
-} = require('@aws-sdk/client-s3');
+const { S3Client, HeadObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 
-
-const {
-  v7: uuidv7,
-} = require('uuid');
+const { v7: uuidv7 } = require('uuid');
 
 async function getTempDir({ accountId = 'engine9' }) {
   const dir = [os.tmpdir(), accountId, new Date().toISOString().substring(0, 10)].join(path.sep);
@@ -52,7 +45,10 @@ async function getTempFilename(options) {
     }
 
     // make a distinct directory, so we don't overwrite the file
-    dir = `${dir}/${new Date().toISOString().slice(0, -6).replace(/[^0-9]/g, '_')}`;
+    dir = `${dir}/${new Date()
+      .toISOString()
+      .slice(0, -6)
+      .replace(/[^0-9]/g, '_')}`;
 
     const newDir = await mkdirp(dir);
 
@@ -97,8 +93,8 @@ async function getPacketFiles({ packet }) {
         const info = await s3Client.send(
           new HeadObjectCommand({
             Bucket,
-            Key,
-          }),
+            Key
+          })
         );
         size = info.ContentLength;
         progress(`Retrieving file of size ${size / (1024 * 1024)} MB`);
@@ -107,13 +103,14 @@ async function getPacketFiles({ packet }) {
 
       stream(offset, length) {
         const ptStream = new PassThrough();
-        s3Client.send(
-          new GetObjectCommand({
-            Bucket,
-            Key,
-            Range: `bytes=${offset}-${length ?? ''}`,
-          }),
-        )
+        s3Client
+          .send(
+            new GetObjectCommand({
+              Bucket,
+              Key,
+              Range: `bytes=${offset}-${length ?? ''}`
+            })
+          )
           .then((response) => {
             response.Body.pipe(ptStream);
           })
@@ -122,7 +119,7 @@ async function getPacketFiles({ packet }) {
           });
 
         return ptStream;
-      },
+      }
     });
 
     return directory;
@@ -130,7 +127,6 @@ async function getPacketFiles({ packet }) {
   const directory = await unzipper.Open.file(packet);
   return directory;
 }
-
 
 async function getManifest({ packet }) {
   if (!packet) throw new Error('no packet option specififed');
@@ -156,8 +152,8 @@ function getBatchTransform({ batchSize = 100 }) {
       flush(cb) {
         if (this.buffer?.length > 0) this.push(this.buffer);
         cb();
-      },
-    }),
+      }
+    })
   };
 }
 function getDebatchTransform() {
@@ -167,8 +163,8 @@ function getDebatchTransform() {
       transform(chunk, encoding, cb) {
         chunk.forEach((c) => this.push(c));
         cb();
-      },
-    }),
+      }
+    })
   };
 }
 
@@ -218,7 +214,8 @@ async function downloadFile({ packet, type = 'person' }) {
   const filename = await getTempFilename({ targetFilename: filePath.split('/').pop() });
 
   return new Promise((resolve, reject) => {
-    fileStream.pipe(fs.createWriteStream(filename))
+    fileStream
+      .pipe(fs.createWriteStream(filename))
       .on('error', reject)
       .on('finish', () => {
         resolve({ filename });
@@ -228,12 +225,12 @@ async function downloadFile({ packet, type = 'person' }) {
 
 function isValidDate(d) {
   // we WANT to use isNaN, not the Number.isNaN -- we're checking the date type
-  // eslint-disable-next-line no-restricted-globals
+
   return d instanceof Date && !isNaN(d);
 }
 
 function bool(x, _defaultVal) {
-  const defaultVal = (_defaultVal === undefined) ? false : _defaultVal;
+  const defaultVal = _defaultVal === undefined ? false : _defaultVal;
   if (x === undefined || x === null || x === '') return defaultVal;
   if (typeof x !== 'string') return !!x;
   if (x === '1') return true; // 0 will return false, but '1' is true
@@ -255,7 +252,7 @@ function relativeDate(s, _initialDate) {
   if (!s || s === 'none') return null;
   if (typeof s.getMonth === 'function') return s;
   // We actually want a double equals here to test strings as well
-  // eslint-disable-next-line eqeqeq
+
   if (parseInt(s, 10) == s) {
     const r = new Date(parseInt(s, 10));
     if (!isValidDate(r)) throw new Error(`Invalid integer date:${s}`);
@@ -274,15 +271,31 @@ function relativeDate(s, _initialDate) {
     let period = null;
     switch (r[3]) {
       case 'Y':
-      case 'y': period = 'years'; break;
+      case 'y':
+        period = 'years';
+        break;
 
-      case 'M': period = 'months'; break;
-      case 'w': period = 'weeks'; break;
-      case 'd': period = 'days'; break;
-      case 'h': period = 'hours'; break;
-      case 'm': period = 'minutes'; break;
-      case 's': period = 'seconds'; break;
-      default: period = 'minutes'; break;
+      case 'M':
+        period = 'months';
+        break;
+      case 'w':
+        period = 'weeks';
+        break;
+      case 'd':
+        period = 'days';
+        break;
+      case 'h':
+        period = 'hours';
+        break;
+      case 'm':
+        period = 'minutes';
+        break;
+      case 's':
+        period = 'seconds';
+        break;
+      default:
+        period = 'minutes';
+        break;
     }
 
     let d = dayjs(initialDate);
@@ -317,12 +330,29 @@ function relativeDate(s, _initialDate) {
 */
 function makeStrings(o) {
   return Object.entries(o).reduce((a, [k, v]) => {
-    a[k] = (typeof v === 'object') ? JSON.stringify(v) : String(v);
+    a[k] = typeof v === 'object' ? JSON.stringify(v) : String(v);
     return a;
   }, {});
 }
+function appendPostfix(filename, postfix) {
+  const filenameParts = filename.split('/');
+  const fileParts = filenameParts
+    .slice(-1)[0]
+    .split('.')
+    .filter(Boolean)
+    .filter((d) => d !== postfix);
+
+  let targetFile = null;
+  if (fileParts.slice(-1)[0] === 'gz') {
+    targetFile = fileParts.slice(0, -2).concat(postfix).concat(fileParts.slice(-2)).join('.');
+  } else {
+    targetFile = fileParts.slice(0, -1).concat(postfix).concat(fileParts.slice(-1)).join('.');
+  }
+  return filenameParts.slice(0, -1).concat(targetFile).join('/');
+}
 
 module.exports = {
+  appendPostfix,
   bool,
   downloadFile,
   getTempFilename,
@@ -336,5 +366,5 @@ module.exports = {
   makeStrings,
   relativeDate,
   streamPacket,
-  writeTempFile,
+  writeTempFile
 };
