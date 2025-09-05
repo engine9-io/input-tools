@@ -1,17 +1,15 @@
-/* eslint-disable no-await-in-loop */
 const fs = require('node:fs');
 
 const fsp = fs.promises;
 const path = require('node:path');
 const zlib = require('node:zlib');
-const {
-  Readable, Transform, PassThrough, Writable,
-} = require('node:stream');
+const { Readable, Transform, PassThrough, Writable } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const { stringify } = require('csv');
 
 const debug = require('debug')('FileWorker');
 
+const { getXlsxStream } = require('xlstream');
 const csv = require('csv');
 const JSON5 = require('json5');
 const languageEncoding = require('detect-file-encoding-and-language');
@@ -20,10 +18,18 @@ const S3Worker = require('./S3');
 const ParquetWorker = require('./Parquet');
 
 const {
-  bool, getStringArray, getTempDir, makeStrings, streamPacket,relativeDate
+  bool,
+  getTempFilename,
+  getStringArray,
+  getTempDir,
+  makeStrings,
+  streamPacket,
+  relativeDate
 } = require('./tools');
 
-function Worker({ accountId }) { this.accountId = accountId; }
+function Worker({ accountId }) {
+  this.accountId = accountId;
+}
 
 class LineReaderTransform extends Transform {
   constructor(options = {}) {
@@ -31,7 +37,6 @@ class LineReaderTransform extends Transform {
     this.buffer = '';
   }
 
-  // eslint-disable-next-line no-underscore-dangle
   _transform(chunk, encoding, callback) {
     this.buffer += chunk.toString();
     const lines = this.buffer.split(/\r?\n/);
@@ -40,7 +45,6 @@ class LineReaderTransform extends Transform {
     callback();
   }
 
-  // eslint-disable-next-line no-underscore-dangle
   _flush(callback) {
     if (this.buffer) {
       this.push(this.buffer);
@@ -53,7 +57,11 @@ Worker.prototype.csvToObjectTransforms = function (options) {
   const transforms = [];
   const delimiter = options.delimiter || ',';
 
-  const headerMapping = options.headerMapping || function (d) { return d; };
+  const headerMapping =
+    options.headerMapping ||
+    function (d) {
+      return d;
+    };
   let lastLine = null;
   let head = null;
 
@@ -63,7 +71,7 @@ Worker.prototype.csvToObjectTransforms = function (options) {
     skip_empty_lines: true,
     delimiter,
     max_limit_on_data_read: 10000000,
-    skip_lines_with_error: skipLinesWithError,
+    skip_lines_with_error: skipLinesWithError
   };
   if (options.skip) parserOptions.from_line = options.skip;
   if (options.relax_column_count) parserOptions.relax_column_count = true;
@@ -101,7 +109,7 @@ Worker.prototype.csvToObjectTransforms = function (options) {
 
       lastLine = row.join(delimiter);
       return cb(null, o);
-    },
+    }
   });
 
   transforms.push(parser);
@@ -124,12 +132,15 @@ Worker.prototype.detectEncoding = async function (options) {
     // needed chunk size.
     finalBuff = await new Promise((resolve, reject) => {
       const bufferBuilder = [];
-      const decompressStream = zlib.createGunzip()
+      const decompressStream = zlib
+        .createGunzip()
         .on('data', (chunk) => {
           bufferBuilder.push(chunk);
-        }).on('close', () => {
+        })
+        .on('close', () => {
           resolve(Buffer.concat(bufferBuilder));
-        }).on('error', (err) => {
+        })
+        .on('error', (err) => {
           if (err.errno !== -5) {
             // EOF: expected
             reject(err);
@@ -145,15 +156,57 @@ Worker.prototype.detectEncoding = async function (options) {
 
 Worker.prototype.detectEncoding.metadata = {
   options: {
-    filename: { required: true },
-  },
+    filename: { required: true }
+  }
+};
+
+Worker.prototype.xlsxToObjectStream = async function (options) {
+  let { filename } = options;
+
+  if (filename.startsWith('s3://') || filename.startsWith('r2://')) {
+    // We need to copy and delete
+    let worker = null;
+    if (filename.startsWith('r2://')) {
+      worker = new R2Worker(this);
+    } else {
+      worker = new S3Worker(this);
+    }
+    const target = getTempFilename({ targetFilename: filename.split('/').pop() });
+
+    await worker.copy({ filename, target });
+    filename = target;
+  }
+  let stream = await getXlsxStream({
+    filePath: filename,
+    sheet: 0
+  });
+  let keys = null;
+  stream = stream.pipe(
+    new Transform({
+      objectMode: true,
+      transform(d, enc, cb) {
+        if (!keys) {
+          keys = d?.raw.arr;
+          cb();
+        } else {
+          let o = {};
+          keys.forEach((k, i) => {
+            o[k] = d?.raw?.arr?.[i];
+          });
+          cb(null, o);
+        }
+      }
+    })
+  );
+
+  return { stream };
 };
 
 /*
-Internal method to transform a file into a stream of objects.
+Commonly used method to transform a file into a stream of objects.
 */
 Worker.prototype.fileToObjectStream = async function (options) {
-  const { filename, columns, limit: limitOption,format:formatOverride } = options;
+  const { filename, columns, limit: limitOption, format: formatOverride } = options;
 
   // handle stream item
   if (options.stream) {
@@ -167,6 +220,9 @@ Worker.prototype.fileToObjectStream = async function (options) {
   let limit;
   if (limitOption) limit = parseInt(limitOption, 10);
   if (!filename) throw new Error('fileToObjectStream: filename is required');
+  if (filename.split('.').pop().toLowerCase() === 'xlsx') {
+    return this.xlsxToObjectStream(options);
+  }
   let postfix = options.sourcePostfix || filename.toLowerCase().split('.').pop();
   if (postfix === 'zip') {
     debug('Invalid filename:', { filename });
@@ -176,7 +232,7 @@ Worker.prototype.fileToObjectStream = async function (options) {
   const streamInfo = await this.stream({
     filename,
     columns,
-    limit,
+    limit
   });
   const { encoding } = streamInfo;
   let { stream } = streamInfo;
@@ -203,7 +259,7 @@ Worker.prototype.fileToObjectStream = async function (options) {
   } else {
     stream.setEncoding(encoding);
   }
-  let format=formatOverride || postfix;
+  let format = formatOverride || postfix;
 
   if (format === 'csv') {
     const csvTransforms = this.csvToObjectTransforms({ ...options });
@@ -243,13 +299,15 @@ Worker.prototype.fileToObjectStream = async function (options) {
         }
         if (headers) {
           const mapped = {};
-          headers.forEach((name, i) => { mapped[name] = obj[i]; });
+          headers.forEach((name, i) => {
+            mapped[name] = obj[i];
+          });
           this.push(mapped);
         } else {
           this.push(obj);
         }
         return cb();
-      },
+      }
     });
 
     transforms.push(lineReader);
@@ -260,9 +318,11 @@ Worker.prototype.fileToObjectStream = async function (options) {
   const countAndDebug = new Transform({
     objectMode: true,
     transform(d, enc, cb) {
-      if (count === 0) { debug('Sample object from file:', d); }
+      if (count === 0) {
+        debug('Sample object from file:', d);
+      }
       count += 1;
-      if ((count < 5000 && count % 1000 === 0) || (count % 50000 === 0)) {
+      if ((count < 5000 && count % 1000 === 0) || count % 50000 === 0) {
         debug(`fileToObjectStream transformed ${count} lines`);
       }
       this.push(d);
@@ -279,7 +339,7 @@ Worker.prototype.fileToObjectStream = async function (options) {
         this.push(o);
       } */
       cb();
-    },
+    }
   });
 
   transforms.push(countAndDebug);
@@ -319,14 +379,14 @@ Worker.prototype.getOutputStreams = async function (options) {
         objectMode: true,
         async transform(item, encoding, cb) {
           options.transform(item, encoding, cb);
-        },
+        }
       });
     } else {
       transform = new Transform({
         objectMode: true,
         async transform(item, encoding, cb) {
           cb(null, options.transform(item));
-        },
+        }
       });
     }
   } else if (options.transform) {
@@ -345,7 +405,7 @@ Worker.prototype.getOutputStreams = async function (options) {
           let v = item[k];
           if (!o[k]) {
             if (typeof v === 'object') {
-              while (Array.isArray(v)) [v] = v;// get first array item
+              while (Array.isArray(v)) [v] = v; // get first array item
               o = { ...o, ...v };
             } else {
               o[k] = v;
@@ -353,12 +413,12 @@ Worker.prototype.getOutputStreams = async function (options) {
           }
         });
         cb(null, o);
-      },
+      }
     });
   }
 
   const stats = {
-    records: 0,
+    records: 0
   };
   let stringifier;
   if (options.targetFormat === 'jsonl') {
@@ -366,7 +426,7 @@ Worker.prototype.getOutputStreams = async function (options) {
       objectMode: true,
       transform(d, encoding, cb) {
         cb(false, `${JSON.stringify(d)}\n`);
-      },
+      }
     });
   } else {
     stringifier = stringify({ header: true });
@@ -383,11 +443,11 @@ Worker.prototype.getOutputStreams = async function (options) {
       transform(d, enc, cb) {
         stats.records += 1;
         cb(null, d);
-      },
+      }
     }),
     stringifier,
     gzip,
-    fileWriterStream,
+    fileWriterStream
   ].filter(Boolean);
   return { filename, streams, stats };
 };
@@ -395,9 +455,7 @@ Worker.prototype.objectStreamToFile = async function (options) {
   const { filename, streams, stats } = await this.getOutputStreams(options);
   const { stream: inStream } = options;
   streams.unshift(inStream);
-  await pipeline(
-    streams,
-  );
+  await pipeline(streams);
   return { filename, records: stats.records };
 };
 
@@ -432,7 +490,7 @@ Worker.prototype.transform = async function (options) {
     if (typeof f === 'function') {
       f = new Transform({
         objectMode: true,
-        transform: f,
+        transform: f
       });
     }
 
@@ -441,7 +499,10 @@ Worker.prototype.transform = async function (options) {
 
   const { targetFormat } = options;
 
-  if (!targetFormat && (filename.toLowerCase().slice(-4) === '.csv' || filename.toLowerCase().slice(-7) === '.csv.gz')) {
+  if (
+    !targetFormat &&
+    (filename.toLowerCase().slice(-4) === '.csv' || filename.toLowerCase().slice(-7) === '.csv.gz')
+  ) {
     options.targetFormat = 'csv';
   }
 
@@ -453,33 +514,34 @@ Worker.prototype.transform.metadata = {
     sourcePostfix: { description: "Override the source postfix, if for example it's a csv" },
     encoding: { description: 'Manual override of source file encoding' },
     names: { description: 'Target field names (e.g. my_new_field,x,y,z)' },
-    values: { description: "Comma delimited source field name, or Handlebars [[ ]] merge fields (e.g. 'my_field,x,y,z', '[[field1]]-[[field2]]', etc)" },
+    values: {
+      description:
+        "Comma delimited source field name, or Handlebars [[ ]] merge fields (e.g. 'my_field,x,y,z', '[[field1]]-[[field2]]', etc)"
+    },
     targetFilename: { description: 'Custom name of the output file (default auto-generated)' },
     targetFormat: { description: 'Output format -- csv supported, or none for txt (default)' },
     targetRowDelimiter: { description: 'Row delimiter (default \n)' },
-    targetFieldDelimiter: { description: 'Field delimiter (default \t or ,)' },
-  },
+    targetFieldDelimiter: { description: 'Field delimiter (default \t or ,)' }
+  }
 };
 Worker.prototype.testTransform = async function (options) {
   return this.transform({
     ...options,
-    transform(d, enc, cb) { d.transform_time = new Date(); cb(null, d); },
+    transform(d, enc, cb) {
+      d.transform_time = new Date();
+      cb(null, d);
+    }
   });
 };
 Worker.prototype.testTransform.metadata = {
   options: {
-    filename: true,
-  },
+    filename: true
+  }
 };
 
 /* Get a stream from an actual stream, or an array, or a file */
-Worker.prototype.stream = async function (
-  options,
-) {
-  const {
-    stream: inputStream, packet, type, columns, limit,
-    filename: filenameOpt,
-  } = options;
+Worker.prototype.stream = async function (options) {
+  const { stream: inputStream, packet, type, columns, limit, filename: filenameOpt } = options;
   let filename = filenameOpt;
 
   if (inputStream) {
@@ -496,7 +558,8 @@ Worker.prototype.stream = async function (
     } else {
       // debug(`Not prepending filename:${filename}`);
     }
-    let encoding; let stream;
+    let encoding;
+    let stream;
     if (filename.slice(-8) === '.parquet') {
       const pq = new ParquetWorker(this);
       stream = (await pq.stream({ filename, columns, limit })).stream;
@@ -541,9 +604,8 @@ Worker.prototype.sample = async function (opts) {
 };
 Worker.prototype.sample.metadata = {
   options: {
-    filename: {},
-
-  },
+    filename: {}
+  }
 };
 Worker.prototype.toArray = async function (opts) {
   const { stream } = await this.fileToObjectStream(opts);
@@ -551,8 +613,8 @@ Worker.prototype.toArray = async function (opts) {
 };
 Worker.prototype.toArray.metadata = {
   options: {
-    filename: {},
-  },
+    filename: {}
+  }
 };
 
 Worker.prototype.write = async function (opts) {
@@ -566,7 +628,7 @@ Worker.prototype.write = async function (opts) {
     await worker.write({
       directory,
       file,
-      content,
+      content
     });
   } else {
     await fsp.writeFile(filename, content);
@@ -576,15 +638,14 @@ Worker.prototype.write = async function (opts) {
 Worker.prototype.write.metadata = {
   options: {
     filename: { description: 'Location to write content to, can be local or s3:// or r2://' },
-    content: {},
-  },
+    content: {}
+  }
 };
 
 async function streamToString(stream) {
   // lets have a ReadableStream as a stream variable
   const chunks = [];
 
-  // eslint-disable-next-line no-restricted-syntax
   for await (const chunk of stream) {
     chunks.push(Buffer.from(chunk));
   }
@@ -606,47 +667,46 @@ Worker.prototype.json = async function (opts) {
 };
 Worker.prototype.json.metadata = {
   options: {
-    filename: { description: 'Get a javascript object from a file' },
-  },
+    filename: { description: 'Get a javascript object from a file' }
+  }
 };
 
-Worker.prototype.list = async function ({ directory, start:s, end:e }) {
+Worker.prototype.list = async function ({ directory, start: s, end: e }) {
   if (!directory) throw new Error('directory is required');
-  let start=null;
-  let end=null;
-  if (s) start=relativeDate(s);
-  if (e) end=relativeDate(e);
-  
+  let start = null;
+  let end = null;
+  if (s) start = relativeDate(s);
+  if (e) end = relativeDate(e);
+
   if (directory.startsWith('s3://') || directory.startsWith('r2://')) {
     const worker = new (directory.startsWith('r2://') ? R2Worker : S3Worker)(this);
     return worker.list({ directory, start, end });
   }
   const a = await fsp.readdir(directory, { withFileTypes: true });
 
-  const withModified=[];
+  const withModified = [];
   for (const file of a) {
-      const fullPath = path.join(directory, file.name);
-      const stats = await fsp.stat(fullPath);
-      if (start && stats.mtime<start.getTime()){
-        //do not include
-      }else if (end && stats.mtime>end.getTime()){
-        //do nothing
-      }else{
-          withModified.push({
-            name:file.name,
-            type: file.isDirectory() ? 'directory' : 'file',
-            modifiedAt:new Date(stats.mtime).toISOString(),
-          });
-      }
+    const fullPath = path.join(directory, file.name);
+    const stats = await fsp.stat(fullPath);
+    if (start && stats.mtime < start.getTime()) {
+      //do not include
+    } else if (end && stats.mtime > end.getTime()) {
+      //do nothing
+    } else {
+      withModified.push({
+        name: file.name,
+        type: file.isDirectory() ? 'directory' : 'file',
+        modifiedAt: new Date(stats.mtime).toISOString()
+      });
+    }
   }
-  
+
   return withModified;
-  
 };
 Worker.prototype.list.metadata = {
   options: {
-    directory: { required: true },
-  },
+    directory: { required: true }
+  }
 };
 
 Worker.prototype.listAll = async function ({ directory }) {
@@ -661,8 +721,8 @@ Worker.prototype.listAll = async function ({ directory }) {
 };
 Worker.prototype.listAll.metadata = {
   options: {
-    directory: { required: true },
-  },
+    directory: { required: true }
+  }
 };
 
 Worker.prototype.empty = async function ({ directory }) {
@@ -672,7 +732,7 @@ Worker.prototype.empty = async function ({ directory }) {
     throw new Error('Cannot empty an s3:// or r2:// directory');
   }
   const removed = [];
-  // eslint-disable-next-line no-restricted-syntax
+
   for (const file of await fsp.readdir(directory)) {
     removed.push(file);
     await fsp.unlink(path.join(directory, file));
@@ -681,8 +741,8 @@ Worker.prototype.empty = async function ({ directory }) {
 };
 Worker.prototype.empty.metadata = {
   options: {
-    directory: { required: true },
-  },
+    directory: { required: true }
+  }
 };
 
 Worker.prototype.remove = async function ({ filename }) {
@@ -705,16 +765,18 @@ Worker.prototype.remove = async function ({ filename }) {
 };
 Worker.prototype.remove.metadata = {
   options: {
-    filename: {},
-  },
+    filename: {}
+  }
 };
 
 Worker.prototype.move = async function ({ filename, target }) {
   if (!target) throw new Error('target is required');
   if (typeof target !== 'string') throw new Error(`target isn't a string:${JSON.stringify(target)}`);
   if (target.startsWith('s3://') || target.startsWith('r2://')) {
-    if ((target.startsWith('s3://') && filename.startsWith('r2://'))
-      || (target.startsWith('r2://') && filename.startsWith('s3://'))) {
+    if (
+      (target.startsWith('s3://') && filename.startsWith('r2://')) ||
+      (target.startsWith('r2://') && filename.startsWith('s3://'))
+    ) {
       throw new Error('Cowardly not copying between services');
     }
 
@@ -741,8 +803,8 @@ Worker.prototype.move = async function ({ filename, target }) {
 Worker.prototype.move.metadata = {
   options: {
     filename: {},
-    target: {},
-  },
+    target: {}
+  }
 };
 
 Worker.prototype.stat = async function ({ filename }) {
@@ -751,11 +813,7 @@ Worker.prototype.stat = async function ({ filename }) {
     const worker = new (filename.startsWith('r2://') ? R2Worker : S3Worker)(this);
     return worker.stat({ filename });
   }
-  const {
-    ctime,
-    birthtime,
-    size,
-  } = await fsp.stat(filename);
+  const { ctime, birthtime, size } = await fsp.stat(filename);
   const modifiedAt = new Date(ctime);
   let createdAt = birthtime;
   if (createdAt === 0 || !createdAt) createdAt = ctime;
@@ -763,13 +821,13 @@ Worker.prototype.stat = async function ({ filename }) {
   return {
     createdAt,
     modifiedAt,
-    size,
+    size
   };
 };
 Worker.prototype.stat.metadata = {
   options: {
-    filename: {},
-  },
+    filename: {}
+  }
 };
 
 Worker.prototype.download = async function ({ filename }) {
@@ -782,8 +840,8 @@ Worker.prototype.download = async function ({ filename }) {
 };
 Worker.prototype.download.metadata = {
   options: {
-    filename: {},
-  },
+    filename: {}
+  }
 };
 
 Worker.prototype.head = async function (options) {
@@ -792,7 +850,7 @@ Worker.prototype.head = async function (options) {
   const chunks = [];
 
   let counter = 0;
-  // eslint-disable-next-line no-restricted-syntax
+
   for await (const chunk of stream) {
     chunks.push(chunk);
     counter += 1;
@@ -804,8 +862,8 @@ Worker.prototype.head = async function (options) {
 
 Worker.prototype.head.metadata = {
   options: {
-    filename: { required: true },
-  },
+    filename: { required: true }
+  }
 };
 
 Worker.prototype.count = async function (options) {
@@ -814,7 +872,7 @@ Worker.prototype.count = async function (options) {
 
   const limit = options.limit || 5;
   let records = 0;
-  // eslint-disable-next-line no-restricted-syntax
+
   for await (const chunk of stream) {
     records += 1;
     if (records < limit) {
@@ -827,8 +885,8 @@ Worker.prototype.count = async function (options) {
 
 Worker.prototype.count.metadata = {
   options: {
-    filename: { required: true },
-  },
+    filename: { required: true }
+  }
 };
 
 // Get a set of unique entries from a uniqueFunction
@@ -839,10 +897,10 @@ Worker.prototype.getUniqueSet = async function (options) {
 
   let { uniqueFunction } = options;
   if (!uniqueFunction) {
-    uniqueFunction = ((o) => JSON.stringify(o));
+    uniqueFunction = (o) => JSON.stringify(o);
   }
   const uniqueSet = new Set();
-  // eslint-disable-next-line no-restricted-syntax, guard-for-in
+
   for (const filename of existingFiles) {
     const { stream: existsStream } = await this.fileToObjectStream({ filename });
     await pipeline(
@@ -856,14 +914,14 @@ Worker.prototype.getUniqueSet = async function (options) {
           }
           uniqueSet.add(v);
           cb(null, d);
-        },
+        }
       }),
       new Writable({
         objectMode: true,
         write(d, enc, cb) {
           cb();
-        },
-      }),
+        }
+      })
     );
     debug(`Finished loading ${filename}`);
   }
@@ -875,7 +933,7 @@ Worker.prototype.getUniqueStream = async function (options) {
 
   const { uniqueSet, uniqueFunction, sample } = await this.getUniqueSet({
     filenames: options.existingFiles,
-    uniqueFunction: options.uniqueFunction,
+    uniqueFunction: options.uniqueFunction
   });
 
   const { stream: inStream } = await this.fileToObjectStream(options);
@@ -899,8 +957,8 @@ Worker.prototype.getUniqueStream = async function (options) {
           }
           cb(null, d);
         }
-      },
-    }),
+      }
+    })
   );
   return { stream: uniqueStream, sample };
 };
@@ -912,9 +970,9 @@ Worker.prototype.getUniqueStream.metadata = {
     filename: { description: 'Specify a source filename or a stream' },
     stream: { description: 'Specify a source filename or a stream' },
     includeDuplicateSourceRecords: {
-      description: 'Sometimes you want the output to include source dupes, sometimes not, default false',
-    },
-  },
+      description: 'Sometimes you want the output to include source dupes, sometimes not, default false'
+    }
+  }
 };
 Worker.prototype.getUniqueFile = async function (options) {
   const { stream, sample } = await this.getUniqueStream(options);
@@ -929,9 +987,9 @@ Worker.prototype.getUniqueFile.metadata = {
     filename: { description: 'Specify a source filename or a stream' },
     stream: { description: 'Specify a source filename or a stream' },
     includeDuplicateSourceRecords: {
-      description: 'Sometimes you want the output to include source dupes, sometimes not, default false',
-    },
-  },
+      description: 'Sometimes you want the output to include source dupes, sometimes not, default false'
+    }
+  }
 };
 
 /*
@@ -940,7 +998,11 @@ Requires 2 passes of the files,
 but that's a better tradeoff than trying to store huge files in memory
 */
 Worker.prototype.diff = async function ({
-  fileA, fileB, uniqueFunction: ufOpt, fields, includeDuplicateSourceRecords,
+  fileA,
+  fileB,
+  uniqueFunction: ufOpt,
+  fields,
+  includeDuplicateSourceRecords
 }) {
   if (ufOpt && fields) throw new Error('fields and uniqueFunction cannot both be specified');
   let uniqueFunction = ufOpt;
@@ -953,17 +1015,18 @@ Worker.prototype.diff = async function ({
     existingFiles: [fileB],
     filename: fileA,
     uniqueFunction,
-    includeDuplicateSourceRecords,
+    includeDuplicateSourceRecords
   });
   const right = await this.getUniqueFile({
     existingFiles: [fileA],
     filename: fileB,
     uniqueFunction,
-    includeDuplicateSourceRecords,
+    includeDuplicateSourceRecords
   });
 
   return {
-    left, right,
+    left,
+    right
   };
 };
 Worker.prototype.diff.metadata = {
@@ -973,9 +1036,9 @@ Worker.prototype.diff.metadata = {
     fields: { description: 'Fields to use for uniqueness -- aka primary key.  Defaults to JSON of line' },
     uniqueFunction: {},
     includeDuplicateSourceRecords: {
-      description: 'Sometimes you want the output to include source dupes, sometimes not, default false',
-    },
-  },
+      description: 'Sometimes you want the output to include source dupes, sometimes not, default false'
+    }
+  }
 };
 
 module.exports = Worker;

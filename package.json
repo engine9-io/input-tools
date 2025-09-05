@@ -1,6 +1,6 @@
 {
   "name": "@engine9-io/input-tools",
-  "version": "1.7.9",
+  "version": "1.8.0",
   "description": "Tools for dealing with Engine9 inputs",
   "main": "index.js",
   "scripts": {
@@ -30,6 +30,7 @@
     "throttle-debounce": "^5.0.2",
     "unzipper": "^0.12.1",
     "uuid": "^11.1.0",
+    "xlstream": "^2.5.5",
     "yargs": "^17.7.2"
   },
   "directories": {
