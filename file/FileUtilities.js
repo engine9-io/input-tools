@@ -78,6 +78,9 @@ Worker.prototype.csvToObjectTransforms = function (options) {
   if (options.quote_escape) {
     parserOptions.escape = options.quote_escape;
   }
+  if (options.limit) {
+    parserOptions.to = options.limit;
+  }
 
   debug('Parser options=', parserOptions);
   const parser = csv.parse(parserOptions);
