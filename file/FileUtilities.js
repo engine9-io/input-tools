@@ -7,7 +7,7 @@ const { Readable, Transform, PassThrough, Writable } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const { stringify } = require('csv');
 
-const debug = require('debug')('FileWorker');
+const debug = require('debug')('@engine9-io/file');
 
 const { getXlsxStream } = require('xlstream');
 const csv = require('csv');

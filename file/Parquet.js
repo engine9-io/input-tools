@@ -1,7 +1,7 @@
 const parquet = require('@dsnp/parquetjs');
 
 const { Readable } = require('node:stream');
-const debug = require('debug')('ParquetWorker');
+const debug = require('debug')('Parquet');
 const { S3Client } = require('@aws-sdk/client-s3');
 const FileWorker = require('./FileUtilities');
 
@@ -16,7 +16,7 @@ async function getReader(options) {
 
     return parquet.ParquetReader.openS3(client, {
       Bucket: parts[2],
-      Key: parts.slice(3).join('/'),
+      Key: parts.slice(3).join('/')
     });
   }
   return parquet.ParquetReader.openFile(filename);
@@ -25,14 +25,14 @@ async function getReader(options) {
 Worker.prototype.meta = async function (options) {
   const reader = await getReader(options);
   return {
-    records: String(reader.metadata?.num_rows),
+    records: String(reader.metadata?.num_rows)
   };
   // getMetadata();
 };
 Worker.prototype.meta.metadata = {
   options: {
-    path: {},
-  },
+    path: {}
+  }
 };
 Worker.prototype.schema = async function (options) {
   const reader = await getReader(options);
@@ -40,8 +40,8 @@ Worker.prototype.schema = async function (options) {
 };
 Worker.prototype.schema.metadata = {
   options: {
-    path: {},
-  },
+    path: {}
+  }
 };
 
 function cleanColumnName(name) {
@@ -49,8 +49,6 @@ function cleanColumnName(name) {
 }
 
 Worker.prototype.stream = async function (options) {
-  const stream = new Readable({ objectMode: true });
-
   const reader = await getReader(options);
   let columns;
   if (options.columns) {
@@ -60,9 +58,9 @@ Worker.prototype.stream = async function (options) {
     if (typeof options.columns === 'string') requestedColumns = options.columns.split(',').map((d) => d.trim());
     else requestedColumns = options.columns.map((d) => (d.name ? d.name.trim() : d.trim()));
     requestedColumns.forEach((c) => {
-      const matchingCols = fieldList.filter((f) => (
-        f.name === c || cleanColumnName(f.name) === cleanColumnName(c)
-      )).map((f) => f.name);
+      const matchingCols = fieldList
+        .filter((f) => f.name === c || cleanColumnName(f.name) === cleanColumnName(c))
+        .map((f) => f.name);
       columns = columns.concat(matchingCols);
     });
   }
@@ -72,35 +70,46 @@ Worker.prototype.stream = async function (options) {
   debug(`Reading parquet file ${options.filename} with columns ${columns?.join(',')} and limit ${limit}`);
   const cursor = reader.getCursor(columns);
 
-  // read all records from the file and print them
-  let record = null;
   let counter = 0;
 
   const start = new Date().getTime();
-  do {
-    // eslint-disable-next-line no-await-in-loop
-    record = await cursor.next();
-    counter += 1;
-    if (limit && counter > limit) {
-      debug(`Reached limit of ${limit}, stopping`);
-      break;
+
+  const stream = new Readable({
+    objectMode: true,
+    async read() {
+      const token = await cursor.next();
+      if (token) {
+        counter += 1;
+        if (limit && counter > limit) {
+          debug(`Reached limit of ${limit}, stopping`);
+          this.push(null);
+          await reader.close();
+          return;
+        }
+        if (counter % 10000 === 0) {
+          let m = process.memoryUsage().heapTotal;
+          const end = new Date().getTime();
+          debug(
+            `Read ${counter} ${(counter * 1000) / (end - start)}/sec, Node reported memory usage: ${
+              m / 1024 / 1024
+            } MBs`
+          );
+        }
+        this.push(token);
+      } else {
+        await reader.close();
+        this.push(null);
+      }
     }
-    if (counter % 5000 === 0) {
-      const end = new Date().getTime();
-      debug(`Read ${counter} ${(counter * 1000) / (end - start)}/sec `);
-    }
-    stream.push(record);
-  } while (record);
-  stream.push(null);
-  await reader.close();
+  });
 
   return { stream };
 };
 
 Worker.prototype.stream.metadata = {
   options: {
-    path: {},
-  },
+    path: {}
+  }
 };
 
 Worker.prototype.toFile = async function (options) {
@@ -110,8 +119,8 @@ Worker.prototype.toFile = async function (options) {
 };
 Worker.prototype.toFile.metadata = {
   options: {
-    path: {},
-  },
+    path: {}
+  }
 };
 
 Worker.prototype.stats = async function (options) {
@@ -125,13 +134,13 @@ Worker.prototype.stats = async function (options) {
   return {
     schema,
     fileMetadata,
-    rowGroups,
+    rowGroups
   };
 };
 Worker.prototype.stats.metadata = {
   options: {
-    path: {},
-  },
+    path: {}
+  }
 };
 
 module.exports = Worker;
