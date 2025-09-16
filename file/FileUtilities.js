@@ -812,20 +812,30 @@ Worker.prototype.move.metadata = {
 
 Worker.prototype.stat = async function ({ filename }) {
   if (!filename) throw new Error('filename is required');
+  const output = {};
+
+  if (filename.slice(-8) === '.parquet') {
+    const pq = new ParquetWorker(this);
+    output.schema = await pq.schema({ filename });
+    output.records = (await pq.meta({ filename }))?.records;
+  }
+
   if (filename.startsWith('s3://') || filename.startsWith('r2://')) {
     const worker = new (filename.startsWith('r2://') ? R2Worker : S3Worker)(this);
-    return worker.stat({ filename });
+    Object.assign(output, await worker.stat({ filename }));
+  } else {
+    const { ctime, birthtime, size } = await fsp.stat(filename);
+    const modifiedAt = new Date(ctime);
+    let createdAt = birthtime;
+    if (createdAt === 0 || !createdAt) createdAt = ctime;
+    createdAt = new Date(createdAt);
+    Object.assign(output, {
+      createdAt,
+      modifiedAt,
+      size
+    });
   }
-  const { ctime, birthtime, size } = await fsp.stat(filename);
-  const modifiedAt = new Date(ctime);
-  let createdAt = birthtime;
-  if (createdAt === 0 || !createdAt) createdAt = ctime;
-  createdAt = new Date(createdAt);
-  return {
-    createdAt,
-    modifiedAt,
-    size
-  };
+  return output;
 };
 Worker.prototype.stat.metadata = {
   options: {

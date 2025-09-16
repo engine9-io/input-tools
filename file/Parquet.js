@@ -24,8 +24,11 @@ async function getReader(options) {
 
 Worker.prototype.meta = async function (options) {
   const reader = await getReader(options);
+  const schema = reader.getSchema();
   return {
-    records: String(reader.metadata?.num_rows)
+    //stored as a buffer
+    schema,
+    records: parseInt(reader.metadata?.num_rows?.toString(), 10)
   };
   // getMetadata();
 };
