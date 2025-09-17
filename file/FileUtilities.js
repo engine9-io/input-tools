@@ -772,7 +772,7 @@ Worker.prototype.remove.metadata = {
   }
 };
 
-Worker.prototype.move = async function ({ filename, target }) {
+Worker.prototype.move = async function ({ filename, target, remove = true }) {
   if (!target) throw new Error('target is required');
   if (typeof target !== 'string') throw new Error(`target isn't a string:${JSON.stringify(target)}`);
   if (target.startsWith('s3://') || target.startsWith('r2://')) {
@@ -793,17 +793,31 @@ Worker.prototype.move = async function ({ filename, target }) {
     if (filename.startsWith('s3://') || filename.startsWith('r2://')) {
       // We need to copy and delete
       const output = await worker.copy({ filename, target });
-      await worker.remove({ filename });
+      if (remove) await worker.remove({ filename });
       return output;
     }
     const parts = target.split('/');
     return worker.put({ filename, directory: parts.slice(0, -1).join('/'), file: parts.slice(-1)[0] });
   }
   await fsp.mkdir(path.dirname(target), { recursive: true });
-  await fsp.rename(filename, target);
+  if (remove) {
+    await fsp.rename(filename, target);
+  } else {
+    await fsp.copyFile(filename, target);
+  }
   return { filename: target };
 };
 Worker.prototype.move.metadata = {
+  options: {
+    filename: {},
+    target: {}
+  }
+};
+
+Worker.prototype.copy = async function (opts) {
+  return this.move({ ...opts, remove: false });
+};
+Worker.prototype.copy.metadata = {
   options: {
     filename: {},
     target: {}
