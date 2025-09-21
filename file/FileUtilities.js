@@ -12,6 +12,7 @@ const debug = require('debug')('@engine9-io/file');
 const { getXlsxStream } = require('xlstream');
 const csv = require('csv');
 const JSON5 = require('json5');
+const { default: pLimit } = require('p-limit');
 const languageEncoding = require('detect-file-encoding-and-language');
 const R2Worker = require('./R2');
 const S3Worker = require('./S3');
@@ -712,17 +713,73 @@ Worker.prototype.list.metadata = {
   }
 };
 
-Worker.prototype.listAll = async function ({ directory }) {
+Worker.prototype.listAll = async function ({ directory, start: s, end: e }) {
   if (!directory) throw new Error('directory is required');
+  let start = null;
+  let end = null;
+  if (s) start = relativeDate(s).getTime();
+  if (e) end = relativeDate(e).getTime();
   if (directory.startsWith('s3://') || directory.startsWith('r2://')) {
     const worker = new (directory.startsWith('r2://') ? R2Worker : S3Worker)(this);
     return worker.listAll({ directory });
   }
   const a = await fsp.readdir(directory, { recursive: true });
 
-  return a.map((f) => `${directory}/${f}`);
+  let files = a.map((f) => `${directory}/${f}`);
+  if (!start && !end) {
+    return files;
+  }
+
+  const limitedMethod = pLimit(10);
+  const filesWithinLimit = [];
+
+  await Promise.all(
+    files.map((filename) =>
+      limitedMethod(async () => {
+        const stats = await fsp.stat(filename);
+        if (start && stats.mtime < start) {
+          //do not include
+        } else if (end && stats.mtime > end) {
+          //do nothing
+        } else {
+          filesWithinLimit.push({
+            name: filename,
+            type: stats.isDirectory() ? 'directory' : 'file',
+            modifiedAt: new Date(stats.mtime).toISOString()
+          });
+        }
+      })
+    )
+  );
+  return filesWithinLimit;
 };
 Worker.prototype.listAll.metadata = {
+  options: {
+    directory: { required: true }
+  }
+};
+Worker.prototype.moveAll = async function (options) {
+  const { directory, targetDirectory } = options;
+  if (!directory) throw new Error('directory is required');
+  if (directory.startsWith('s3://') || directory.startsWith('r2://')) {
+    const worker = new (directory.startsWith('r2://') ? R2Worker : S3Worker)(this);
+    return worker.moveAll(options);
+  }
+  const a = await this.listAll(options);
+
+  let configs = a.map((f) => {
+    let filename = typeof f === 'string' ? f : f.filename;
+    return {
+      filename,
+      target: filename.replace(directory, targetDirectory)
+    };
+  });
+
+  const limitedMethod = pLimit(10);
+
+  return Promise.all(configs.map(({ filename, target }) => limitedMethod(async () => this.move({ filename, target }))));
+};
+Worker.prototype.moveAll.metadata = {
   options: {
     directory: { required: true }
   }

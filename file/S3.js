@@ -7,13 +7,15 @@ const {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
-  GetObjectAttributesCommand, PutObjectCommand,
-  ListObjectsV2Command,
+  GetObjectAttributesCommand,
+  PutObjectCommand,
+  ListObjectsV2Command
 } = require('@aws-sdk/client-s3');
 const { getTempFilename } = require('./tools');
+const { default: pLimit } = require('p-limit');
 
 function Worker() {
-  this.prefix='s3';
+  this.prefix = 's3';
 }
 
 function getParts(filename) {
@@ -35,18 +37,20 @@ Worker.prototype.getMetadata = async function ({ filename }) {
   const s3Client = this.getClient();
   const { Bucket, Key } = getParts(filename);
 
-  const resp = await s3Client.send(new GetObjectAttributesCommand({
-    Bucket,
-    Key,
-    ObjectAttributes: ['ETag', 'Checksum', 'ObjectParts', 'StorageClass', 'ObjectSize'],
-  }));
+  const resp = await s3Client.send(
+    new GetObjectAttributesCommand({
+      Bucket,
+      Key,
+      ObjectAttributes: ['ETag', 'Checksum', 'ObjectParts', 'StorageClass', 'ObjectSize']
+    })
+  );
 
   return resp;
 };
 Worker.prototype.getMetadata.metadata = {
   options: {
-    filename: {},
-  },
+    filename: {}
+  }
 };
 
 Worker.prototype.stream = async function ({ filename }) {
@@ -64,12 +68,16 @@ Worker.prototype.stream = async function ({ filename }) {
 };
 Worker.prototype.stream.metadata = {
   options: {
-    filename: {},
-  },
+    filename: {}
+  }
 };
 
 Worker.prototype.copy = async function ({ filename, target }) {
-  if (!filename.startsWith('s3://')) throw new Error('Cowardly not copying a file not from s3 -- use put instead');
+  if (filename.startsWith('s3://') || filename.startsWith('r2://')) {
+    //we're fine
+  } else {
+    throw new Error('Cowardly not copying a file not from s3 -- use put instead');
+  }
   const s3Client = this.getClient();
   const { Bucket, Key } = getParts(target);
 
@@ -78,7 +86,7 @@ Worker.prototype.copy = async function ({ filename, target }) {
   const command = new CopyObjectCommand({
     CopySource: filename.slice(4), // remove the s3:/
     Bucket,
-    Key,
+    Key
   });
 
   return s3Client.send(command);
@@ -87,8 +95,19 @@ Worker.prototype.copy = async function ({ filename, target }) {
 Worker.prototype.copy.metadata = {
   options: {
     filename: {},
-    target: {},
-  },
+    target: {}
+  }
+};
+Worker.prototype.move = async function ({ filename, target }) {
+  await this.copy({ filename, target });
+  await this.remove({ filename });
+  return { filename: target };
+};
+Worker.prototype.move.metadata = {
+  options: {
+    filename: {},
+    target: {}
+  }
 };
 
 Worker.prototype.remove = async function ({ filename }) {
@@ -99,8 +118,8 @@ Worker.prototype.remove = async function ({ filename }) {
 };
 Worker.prototype.remove.metadata = {
   options: {
-    filename: {},
-  },
+    filename: {}
+  }
 };
 
 Worker.prototype.download = async function ({ filename }) {
@@ -125,15 +144,15 @@ Worker.prototype.download = async function ({ filename }) {
 };
 Worker.prototype.download.metadata = {
   options: {
-    filename: {},
-  },
+    filename: {}
+  }
 };
 
 Worker.prototype.put = async function (options) {
   const { filename, directory } = options;
   if (!filename) throw new Error('Local filename required');
-  if (directory?.indexOf('s3://') !== 0
-&& directory?.indexOf('r2://') !== 0) throw new Error(`directory path must start with s3:// or r2://, is ${directory}`);
+  if (directory?.indexOf('s3://') !== 0 && directory?.indexOf('r2://') !== 0)
+    throw new Error(`directory path must start with s3:// or r2://, is ${directory}`);
 
   const file = options.file || filename.split('/').pop();
   const parts = directory.split('/');
@@ -147,7 +166,10 @@ Worker.prototype.put = async function (options) {
   const s3Client = this.getClient();
 
   const command = new PutObjectCommand({
-    Bucket, Key, Body, ContentType,
+    Bucket,
+    Key,
+    Body,
+    ContentType
   });
 
   return s3Client.send(command);
@@ -156,8 +178,8 @@ Worker.prototype.put.metadata = {
   options: {
     filename: {},
     directory: { description: 'Directory to put file, e.g. s3://foo-bar/dir/xyz' },
-    file: { description: 'Name of file, defaults to the filename' },
-  },
+    file: { description: 'Name of file, defaults to the filename' }
+  }
 };
 
 Worker.prototype.write = async function (options) {
@@ -175,7 +197,10 @@ Worker.prototype.write = async function (options) {
   const ContentType = mime.lookup(file);
 
   const command = new PutObjectCommand({
-    Bucket, Key, Body, ContentType,
+    Bucket,
+    Key,
+    Body,
+    ContentType
   });
 
   return s3Client.send(command);
@@ -184,11 +209,11 @@ Worker.prototype.write.metadata = {
   options: {
     directory: { description: 'Directory to put file, e.g. s3://foo-bar/dir/xyz' },
     file: { description: 'Name of file, defaults to the filename' },
-    content: { description: 'Contents of file' },
-  },
+    content: { description: 'Contents of file' }
+  }
 };
 
-Worker.prototype.list = async function ({ directory, start,end,raw }) {
+Worker.prototype.list = async function ({ directory, start, end, raw }) {
   if (!directory) throw new Error('directory is required');
   let dir = directory;
   while (dir.slice(-1) === '/') dir = dir.slice(0, -1);
@@ -197,59 +222,67 @@ Worker.prototype.list = async function ({ directory, start,end,raw }) {
   const command = new ListObjectsV2Command({
     Bucket,
     Prefix: `${Prefix}/`,
-    Delimiter: '/',
+    Delimiter: '/'
   });
 
   const { Contents: files, CommonPrefixes } = await s3Client.send(command);
   if (raw) return files;
   // debug('Prefixes:', { CommonPrefixes });
-  const output = [].concat((CommonPrefixes || []).map((f) => ({
-    name: f.Prefix.slice(Prefix.length + 1, -1),
-    type: 'directory',
-  })))
-    .concat((files || [])
-    .filter(({LastModified})=>{
-      if (start && new Date(LastModified)<start){
-        return false;
-      }else if (end && new Date(LastModified)>end){
-        return false;
-      }else{
-        return true;
-      }
-    }).map(({ Key, Size, LastModified }) => ({
-      name: Key.slice(Prefix.length + 1),
-      type: 'file',
-      size: Size,
-      modifiedAt: new Date(LastModified).toISOString(),
-    })));
+  const output = []
+    .concat(
+      (CommonPrefixes || []).map((f) => ({
+        name: f.Prefix.slice(Prefix.length + 1, -1),
+        type: 'directory'
+      }))
+    )
+    .concat(
+      (files || [])
+        .filter(({ LastModified }) => {
+          if (start && new Date(LastModified) < start) {
+            return false;
+          } else if (end && new Date(LastModified) > end) {
+            return false;
+          } else {
+            return true;
+          }
+        })
+        .map(({ Key, Size, LastModified }) => ({
+          name: Key.slice(Prefix.length + 1),
+          type: 'file',
+          size: Size,
+          modifiedAt: new Date(LastModified).toISOString()
+        }))
+    );
 
   return output;
 };
 Worker.prototype.list.metadata = {
   options: {
-    directory: { required: true },
-  },
+    directory: { required: true }
+  }
 };
 /* List everything with the prefix */
 Worker.prototype.listAll = async function ({ directory }) {
   if (!directory) throw new Error('directory is required');
   let dir = directory;
   while (dir.slice(-1) === '/') dir = dir.slice(0, -1);
-  const { Bucket, Key: Prefix } = getParts(dir);
+  const { Bucket, Key } = getParts(dir);
   const s3Client = this.getClient();
   const files = [];
   let ContinuationToken = null;
+  let Prefix = null;
+  if (Key) Prefix = `${Key}/`;
   do {
     const command = new ListObjectsV2Command({
       Bucket,
-      Prefix: `${Prefix}/`,
-      ContinuationToken,
+      Prefix,
+      ContinuationToken
       // Delimiter: '/',
     });
     debug(`Sending List command with prefix ${Prefix} with ContinuationToken ${ContinuationToken}`);
-    // eslint-disable-next-line no-await-in-loop
+
     const result = await s3Client.send(command);
-    const newFiles = (result.Contents?.map((d) => `${this.prefix}://${Bucket}/${d.Key}`) || []);
+    const newFiles = result.Contents?.map((d) => `${this.prefix}://${Bucket}/${d.Key}`) || [];
     debug(`Retrieved ${newFiles.length} new files, total ${files.length},sample ${newFiles.slice(0, 3).join(',')}`);
     files.push(...newFiles);
     ContinuationToken = result.NextContinuationToken;
@@ -258,8 +291,27 @@ Worker.prototype.listAll = async function ({ directory }) {
 };
 Worker.prototype.listAll.metadata = {
   options: {
+    directory: { required: true }
+  }
+};
+
+Worker.prototype.moveAll = async function ({ directory, targetDirectory }) {
+  if (!directory || !targetDirectory) throw new Error('directory and targetDirectory required');
+  const files = await this.listAll({ directory });
+  const configs = files.map((d) => ({
+    filename: d,
+    target: d.replace(directory, targetDirectory)
+  }));
+
+  const limitedMethod = pLimit(10);
+
+  return Promise.all(configs.map(({ filename, target }) => limitedMethod(async () => this.move({ filename, target }))));
+};
+Worker.prototype.moveAll.metadata = {
+  options: {
     directory: { required: true },
-  },
+    targetDirectory: { required: true }
+  }
 };
 
 Worker.prototype.stat = async function ({ filename }) {
@@ -275,26 +327,25 @@ Worker.prototype.stat = async function ({ filename }) {
     ContentLength, // : "3191",
     ContentType, // : "image/jpeg",
     // ETag": "\"6805f2cfc46c0f04559748bb039d69ae\"",
-    LastModified, // : "2016-12-15T01:19:41.000Z",
+    LastModified // : "2016-12-15T01:19:41.000Z",
     // Metadata": {},
     // VersionId": "null"
-
   } = response;
   const modifiedAt = new Date(LastModified);
-  const createdAt = modifiedAt;// Same for S3
+  const createdAt = modifiedAt; // Same for S3
   const size = parseInt(ContentLength, 10);
 
   return {
     createdAt,
     modifiedAt,
     contentType: ContentType,
-    size,
+    size
   };
 };
 Worker.prototype.stat.metadata = {
   options: {
-    filename: {},
-  },
+    filename: {}
+  }
 };
 
 module.exports = Worker;

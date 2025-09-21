@@ -216,12 +216,21 @@ function getInputUUID(a, b) {
   return uuidv5(`${pluginId}:${rid}`, '3d0e5d99-6ba9-4fab-9bb2-c32304d3df8e');
 }
 
+const timestampMatch = /^\d{13}$/;
+function dateFromString(s) {
+  if (typeof s === 'number') return new Date(s);
+  if (typeof s === 'string') {
+    if (s.match(timestampMatch)) return new Date(parseInt(s));
+  }
+  return new Date(s);
+}
+
 function getUUIDv7(date, inputUuid) {
   /* optional date and input UUID */
   const uuid = inputUuid || uuidv7();
   const bytes = Buffer.from(uuid.replace(/-/g, ''), 'hex');
   if (date !== undefined) {
-    const d = new Date(date);
+    const d = dateFromString(date);
     // isNaN behaves differently than Number.isNaN -- we're actually going for the
     // attempted conversion here
 

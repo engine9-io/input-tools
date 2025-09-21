@@ -1,6 +1,6 @@
 {
   "name": "@engine9-io/input-tools",
-  "version": "1.8.5",
+  "version": "1.8.6",
   "description": "Tools for dealing with Engine9 inputs",
   "main": "index.js",
   "scripts": {
@@ -26,6 +26,7 @@
     "json5": "^2.2.3",
     "mime-type": "^5.0.3",
     "mkdirp": "^3.0.1",
+    "p-limit": "^7.1.1",
     "parallel-transform": "^1.2.0",
     "throttle-debounce": "^5.0.2",
     "unzipper": "^0.12.1",
