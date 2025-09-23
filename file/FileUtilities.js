@@ -781,7 +781,8 @@ Worker.prototype.moveAll = async function (options) {
 };
 Worker.prototype.moveAll.metadata = {
   options: {
-    directory: { required: true }
+    directory: { required: true },
+    targetDirectory: { required: true }
   }
 };
 

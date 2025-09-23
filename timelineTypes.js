@@ -76,7 +76,13 @@ const EXPORT = 80;
 const EXPORT_FOR_REMOTE = 81;
 
 // Export specifically for sending out messages
-const EXPORT_FOR_MESSAGING = 81;
+const EXPORT_FOR_MESSAGING = 82;
+
+//These are for actions we may not have exact
+// details on, but are useful for modeling, etc
+const INFERRED_ENTRY = 91;
+const INFERRED_MESSAGE = 92;
+const INFERRED_FORM = 93;
 
 // DO. NOT. CHANGE. (once finalized)
 // should probably have offsets between types
@@ -140,7 +146,10 @@ const TIMELINE_ENTRY_TYPES = {
   FILE_IMPORT,
   EXPORT,
   EXPORT_FOR_REMOTE,
-  EXPORT_FOR_MESSAGING
+  EXPORT_FOR_MESSAGING,
+  INFERRED_ENTRY,
+  INFERRED_MESSAGE,
+  INFERRED_FORM
 };
 Object.entries(TIMELINE_ENTRY_TYPES).forEach(([k, v]) => {
   TIMELINE_ENTRY_TYPES[v] = k;
