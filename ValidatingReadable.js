@@ -9,7 +9,6 @@ class ValidatingReadable extends Readable {
     this.validator = validator || (() => true);
   }
 
-  // eslint-disable-next-line no-underscore-dangle
   // _read() {super._read(size)}
 
   push(chunk) {

@@ -12,7 +12,7 @@ const debug = require('debug')('@engine9-io/file');
 const { getXlsxStream } = require('xlstream');
 const csv = require('csv');
 const JSON5 = require('json5');
-const { default: pLimit } = require('p-limit');
+
 const languageEncoding = require('detect-file-encoding-and-language');
 const R2Worker = require('./R2');
 const S3Worker = require('./S3');
@@ -729,7 +729,8 @@ Worker.prototype.listAll = async function ({ directory, start: s, end: e }) {
   if (!start && !end) {
     return files;
   }
-
+  const pLimit = await import('p-limit');
+  pLimit.default();
   const limitedMethod = pLimit(10);
   const filesWithinLimit = [];
 
@@ -774,7 +775,8 @@ Worker.prototype.moveAll = async function (options) {
       target: filename.replace(directory, targetDirectory)
     };
   });
-
+  const pLimit = await import('p-limit');
+  pLimit.default();
   const limitedMethod = pLimit(10);
 
   return Promise.all(configs.map(({ filename, target }) => limitedMethod(async () => this.move({ filename, target }))));
