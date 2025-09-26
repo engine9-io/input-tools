@@ -12,7 +12,6 @@ const {
   ListObjectsV2Command
 } = require('@aws-sdk/client-s3');
 const { getTempFilename } = require('./tools');
-const { default: pLimit } = require('p-limit');
 
 function Worker() {
   this.prefix = 's3';
@@ -303,6 +302,8 @@ Worker.prototype.moveAll = async function ({ directory, targetDirectory }) {
     target: d.replace(directory, targetDirectory)
   }));
 
+  const pLimit = await import('p-limit');
+  pLimit.default();
   const limitedMethod = pLimit(10);
 
   return Promise.all(configs.map(({ filename, target }) => limitedMethod(async () => this.move({ filename, target }))));
