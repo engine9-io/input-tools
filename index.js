@@ -308,6 +308,20 @@ function getEntryTypeId(o, { defaults = {} } = {}) {
   if (id === undefined) throw new Error(`Invalid entry_type: ${etype}`);
   return id;
 }
+function getEntryType(o, defaults = {}) {
+  let etype = o.entry_type || defaults.entry_type;
+  if (etype) return etype;
+
+  const id = o.entry_type_id || defaults.entry_type_id;
+  if (id) return id;
+
+  if (!id) {
+    throw new Error('No entry_type, nor entry_type_id specified, specify a default.entry_type');
+  }
+  etype = TIMELINE_ENTRY_TYPES[id];
+  if (etype === undefined) throw new Error(`Invalid entry_type: ${etype}`);
+  return etype;
+}
 
 module.exports = {
   appendPostfix,
@@ -320,8 +334,10 @@ module.exports = {
   FileUtilities,
   getBatchTransform,
   getDebatchTransform,
-  getManifest,
+  getEntryType,
+  getEntryTypeId,
   getFile,
+  getManifest,
   getStringArray,
   getTempDir,
   getTempFilename,
@@ -331,7 +347,6 @@ module.exports = {
   getInputUUID,
   getUUIDv7,
   getUUIDTimestamp,
-  getEntryTypeId,
   handlebars,
   isValidDate,
   makeStrings,

@@ -730,8 +730,8 @@ Worker.prototype.listAll = async function ({ directory, start: s, end: e }) {
     return files;
   }
   const pLimit = await import('p-limit');
-  pLimit.default();
-  const limitedMethod = pLimit(10);
+
+  const limitedMethod = pLimit.default(10);
   const filesWithinLimit = [];
 
   await Promise.all(
@@ -776,8 +776,8 @@ Worker.prototype.moveAll = async function (options) {
     };
   });
   const pLimit = await import('p-limit');
-  pLimit.default();
-  const limitedMethod = pLimit(10);
+
+  const limitedMethod = pLimit.default(10);
 
   return Promise.all(configs.map(({ filename, target }) => limitedMethod(async () => this.move({ filename, target }))));
 };

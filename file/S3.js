@@ -303,8 +303,7 @@ Worker.prototype.moveAll = async function ({ directory, targetDirectory }) {
   }));
 
   const pLimit = await import('p-limit');
-  pLimit.default();
-  const limitedMethod = pLimit(10);
+  const limitedMethod = pLimit.default(10);
 
   return Promise.all(configs.map(({ filename, target }) => limitedMethod(async () => this.move({ filename, target }))));
 };
