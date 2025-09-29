@@ -248,8 +248,6 @@ Worker.prototype.fileToObjectStream = async function (options) {
 
   let count = 0;
 
-  debug(`Reading file ${filename} with encoding:`, encoding);
-
   let transforms = [];
 
   if (postfix === 'gz') {
@@ -264,6 +262,8 @@ Worker.prototype.fileToObjectStream = async function (options) {
     stream.setEncoding(encoding);
   }
   let format = formatOverride || postfix;
+
+  debug(`Reading file ${filename} with encoding: ${encoding} and format ${format}`);
 
   if (format === 'csv') {
     const csvTransforms = this.csvToObjectTransforms({ ...options });
