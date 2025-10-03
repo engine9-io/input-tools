@@ -890,7 +890,7 @@ Worker.prototype.stat = async function ({ filename }) {
 
   if (filename.slice(-8) === '.parquet') {
     const pq = new ParquetWorker(this);
-    output.schema = await pq.schema({ filename });
+    output.schema = (await pq.schema({ filename }))?.schema;
     output.records = (await pq.meta({ filename }))?.records;
   }
 
