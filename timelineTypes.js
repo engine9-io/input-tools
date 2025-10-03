@@ -31,6 +31,7 @@ const SMS_DELIVERED = 31;
 const SMS_CLICK = 33;
 const SMS_UNSUBSCRIBE = 34;
 const SMS_BOUNCE = 37;
+const SMS_SPAM = 38;
 const SMS_REPLY = 39;
 
 const EMAIL_SEND = 40;
@@ -112,6 +113,7 @@ const TIMELINE_ENTRY_TYPES = {
   SMS_CLICK,
   SMS_UNSUBSCRIBE,
   SMS_BOUNCE,
+  SMS_SPAM,
   SMS_REPLY,
 
   // email interactions
