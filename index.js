@@ -319,6 +319,62 @@ function getEntryType(o, defaults = {}) {
   return etype;
 }
 
+function getDateRangeArray(startDate, endDate) {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const result = [];
+  const msInDay = 24 * 60 * 60 * 1000;
+
+  function addDays(date, days) {
+    const d = new Date(date);
+    d.setDate(d.getDate() + days);
+    return d;
+  }
+  function addMonths(date, months) {
+    const d = new Date(date);
+    d.setMonth(d.getMonth() + months);
+    return d;
+  }
+  function addYears(date, years) {
+    const d = new Date(date);
+    d.setFullYear(d.getFullYear() + years);
+    return d;
+  }
+
+  const diffDays = Math.floor((end - start) / msInDay);
+  const diffMonths = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+  const diffYears = end.getFullYear() - start.getFullYear();
+
+  let current = new Date(start);
+
+  let stepFn;
+  if (diffDays < 10) {
+    stepFn = (date) => addDays(date, 1);
+  } else if (diffDays < 32) {
+    stepFn = (date) => addDays(date, 3);
+  } else if (diffMonths < 4) {
+    stepFn = (date) => addDays(date, 7);
+  } else if (diffYears < 2) {
+    stepFn = (date) => addMonths(date, 1);
+  } else if (diffYears < 4) {
+    stepFn = (date) => addMonths(date, 3);
+  } else {
+    stepFn = (date) => addYears(date, 1);
+  }
+
+  while (current <= end) {
+    result.push(new Date(current));
+    const next = stepFn(current);
+    if (next > end) break;
+    current = next;
+  }
+  // Ensure the last date is exactly the end date
+  if (result.length === 0 || result[result.length - 1].getTime() !== end.getTime()) {
+    result.push(new Date(end));
+  }
+  return result;
+}
+
 module.exports = {
   appendPostfix,
   bool,
@@ -329,6 +385,7 @@ module.exports = {
   ForEachEntry,
   FileUtilities,
   getBatchTransform,
+  getDateRangeArray,
   getDebatchTransform,
   getEntryType,
   getEntryTypeId,
