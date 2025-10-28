@@ -351,6 +351,15 @@ function appendPostfix(filename, postfix) {
   return filenameParts.slice(0, -1).concat(targetFile).join('/');
 }
 
+function parseJSON5(o, defaultVal) {
+  if (o) {
+    if (typeof o === 'object') return o;
+    if (typeof o === 'string') return JSON5.parse(o);
+    throw new Error(`Could not parse object:${o}`);
+  }
+  return defaultVal || o;
+}
+
 module.exports = {
   appendPostfix,
   bool,
@@ -364,6 +373,7 @@ module.exports = {
   getPacketFiles,
   getStringArray,
   makeStrings,
+  parseJSON5,
   relativeDate,
   streamPacket,
   writeTempFile
