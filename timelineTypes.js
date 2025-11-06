@@ -26,6 +26,16 @@ const TRANSACTION_REFUND = 15;
 const SEGMENT_PERSON_ADD = 16;
 const SEGMENT_PERSON_REMOVE = 17;
 
+// unknown generic conversion on a message
+const MESSAGE_CONVERSION = 20;
+// advocacy conversion on a message
+const MESSAGE_CONVERSION_ADVOCACY = 21;
+// unknown transaction conversion on a message
+const MESSAGE_CONVERSION_TRANSACTION = 22;
+
+const MESSAGE_DELIVERY_FAILURE_SHOULD_RETRY = 25;
+const MESSAGE_DELIVERY_FAILURE_SHOULD_NOT_RETRY = 26;
+
 const SMS_SEND = 30;
 const SMS_DELIVERED = 31;
 const SMS_CLICK = 33;
@@ -53,16 +63,6 @@ const PHONE_CALL_FAIL = 52;
 const FORM_SUBMIT = 60;
 const FORM_PETITION = 61;
 const FORM_PETITION_CONTACT_TARGET = 62;
-
-// unknown generic conversion on a message
-const MESSAGE_CONVERSION = 63;
-// advocacy conversion on a message
-const MESSAGE_CONVERSION_ADVOCACY = 64;
-// unknown transaction conversion on a message
-const MESSAGE_CONVERSION_TRANSACTION = 65;
-
-const MESSAGE_DELIVERY_FAILURE_SHOULD_RETRY = 66;
-const MESSAGE_DELIVERY_FAILURE_SHOULD_NOT_RETRY = 66;
 
 const FORM_ADVOCACY = 66;
 const FORM_SURVEY = 67;
