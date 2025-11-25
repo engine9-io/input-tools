@@ -206,6 +206,17 @@ Worker.prototype.xlsxToObjectStream = async function (options) {
   return { stream };
 };
 
+Worker.prototype.getFormat = async function (options) {
+  const { sourcePostfix, filename, format: formatOverride } = options;
+  let postfix = sourcePostfix || filename.toLowerCase().split('.').pop();
+
+  if (postfix === 'gz') {
+    postfix = filename.toLowerCase().split('.');
+    postfix = postfix[postfix.length - 2];
+  }
+  return formatOverride || postfix;
+};
+
 /*
 Commonly used method to transform a file into a stream of objects.
 */
@@ -635,6 +646,8 @@ Worker.prototype.write = async function (opts) {
       content
     });
   } else {
+    const directory = path.dirname(filename);
+    await fsp.mkdir(directory, { recursive: true });
     await fsp.writeFile(filename, content);
   }
   return { success: true, filename };
@@ -953,6 +966,34 @@ Worker.prototype.head.metadata = {
   }
 };
 
+Worker.prototype.columns = async function (options) {
+  const head = await this.head(options);
+  if (head.length == 0) {
+    return {
+      records: 0,
+      likelyHeaderLines: 0,
+      columns: []
+    };
+  }
+
+  let likelyHeaderLines = 1;
+  const columns = Object.keys(head[0]);
+  let s = columns.join(',');
+  if (s.match(/[()@#%!]/)) {
+    likelyHeaderLines = 0;
+  }
+  return {
+    likelyHeaderLines,
+    columns
+  };
+};
+
+Worker.prototype.columns.metadata = {
+  options: {
+    filename: { required: true }
+  }
+};
+
 Worker.prototype.count = async function (options) {
   const { stream } = await this.fileToObjectStream(options);
   const sample = [];
@@ -1084,17 +1125,14 @@ diff that allows for unordered files, and doesn't store full objects in memory.
 Requires 2 passes of the files,
 but that's a better tradeoff than trying to store huge files in memory
 */
-Worker.prototype.diff = async function ({
-  fileA,
-  fileB,
-  uniqueFunction: ufOpt,
-  fields,
-  includeDuplicateSourceRecords
-}) {
-  if (ufOpt && fields) throw new Error('fields and uniqueFunction cannot both be specified');
+Worker.prototype.diff = async function (options) {
+  const { fileA, fileB, uniqueFunction: ufOpt, columns, includeDuplicateSourceRecords } = options;
+  if (options.fields) throw new Error('fields is deprecated, use columns');
+
+  if (ufOpt && columns) throw new Error('fields and uniqueFunction cannot both be specified');
   let uniqueFunction = ufOpt;
-  if (!uniqueFunction && fields) {
-    const farr = getStringArray(fields);
+  if (!uniqueFunction && columns) {
+    const farr = getStringArray(columns);
     uniqueFunction = (o) => farr.map((f) => o[f] || '').join('.');
   }
 
@@ -1120,7 +1158,7 @@ Worker.prototype.diff.metadata = {
   options: {
     fileA: {},
     fileB: {},
-    fields: { description: 'Fields to use for uniqueness -- aka primary key.  Defaults to JSON of line' },
+    columns: { description: 'Columns to use for uniqueness -- aka primary key.  Defaults to JSON of line' },
     uniqueFunction: {},
     includeDuplicateSourceRecords: {
       description: 'Sometimes you want the output to include source dupes, sometimes not, default false'
