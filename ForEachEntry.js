@@ -24,7 +24,7 @@ class ForEachEntry {
     this.fileUtilities = new FileUtilities({ accountId });
   }
 
-  getOutputStream({ name, postfix = '.timeline.csv', validatorFunction = () => true }) {
+  getOutputStream({ name, filename, postfix = '.timeline.csv', validatorFunction = () => true }) {
     this.outputStreams = this.outputStreams || {};
     if (this.outputStreams[name]?.items) return this.outputStreams[name].items;
 
@@ -33,12 +33,14 @@ class ForEachEntry {
     };
 
     return this.outputStreams[name].mutex.runExclusive(async () => {
+      let f = filename || (await getTempFilename({ postfix }));
+
       const fileInfo = {
-        filename: await getTempFilename({ postfix }),
+        filename: f,
         records: 0
       };
 
-      debug(`Output file requested, writing output to to: ${fileInfo.filename}`);
+      debug(`Output file requested ${name}, writing output to to: ${fileInfo.filename}`);
       const outputStream = new ValidatingReadable(
         {
           objectMode: true
