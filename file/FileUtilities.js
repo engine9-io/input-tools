@@ -874,7 +874,14 @@ Worker.prototype.move = async function ({ filename, target, remove = true }) {
   }
   await fsp.mkdir(path.dirname(target), { recursive: true });
   if (remove) {
-    await fsp.rename(filename, target);
+    try {
+      await fsp.rename(filename, target);
+    } catch (e) {
+      //it may be a filesystem issue moving between items
+      debug(e);
+      await fsp.copyFile(filename, target);
+      await fsp.unlink(filename);
+    }
   } else {
     await fsp.copyFile(filename, target);
   }
