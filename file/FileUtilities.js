@@ -769,9 +769,12 @@ Worker.prototype.listAll = async function ({ directory, start: s, end: e }) {
 };
 Worker.prototype.listAll.metadata = {
   options: {
-    directory: { required: true }
+    directory: { required: true },
+    start: {},
+    end: {}
   }
 };
+
 Worker.prototype.moveAll = async function (options) {
   const { directory, targetDirectory } = options;
   if (!directory) throw new Error('directory is required');
@@ -818,6 +821,23 @@ Worker.prototype.empty = async function ({ directory }) {
 Worker.prototype.empty.metadata = {
   options: {
     directory: { required: true }
+  }
+};
+
+Worker.prototype.removeAll = async function (options) {
+  const filenames = await this.listAll(options);
+
+  const pLimit = await import('p-limit');
+
+  const limitedMethod = pLimit.default(10);
+
+  return Promise.all(filenames.map((filename) => limitedMethod(async () => this.remove({ filename }))));
+};
+Worker.prototype.removeAll.metadata = {
+  options: {
+    directory: { required: true },
+    start: {},
+    end: {}
   }
 };
 
