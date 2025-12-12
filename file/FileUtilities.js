@@ -734,7 +734,7 @@ Worker.prototype.listAll = async function ({ directory, start: s, end: e }) {
   if (e) end = relativeDate(e).getTime();
   if (directory.startsWith('s3://') || directory.startsWith('r2://')) {
     const worker = new (directory.startsWith('r2://') ? R2Worker : S3Worker)(this);
-    return worker.listAll({ directory });
+    return worker.listAll({ directory, start, end });
   }
   const a = await fsp.readdir(directory, { recursive: true });
 

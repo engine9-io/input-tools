@@ -249,6 +249,28 @@ function getUUIDTimestamp(uuid) {
   return new Date(ts);
 }
 
+function getEntryTypeId(o, { defaults = {} } = {}) {
+  let id = o.entry_type_id || defaults.entry_type_id;
+  if (id) return id;
+  const etype = o.entry_type || defaults.entry_type;
+  if (!etype) {
+    throw new Error('No entry_type, nor entry_type_id specified, specify a defaultEntryType');
+  }
+  id = TIMELINE_ENTRY_TYPES[etype];
+  if (id === undefined) throw new Error(`Invalid entry_type: ${etype}`);
+  return id;
+}
+function getEntryType(o, defaults = {}) {
+  let etype = o.entry_type || defaults.entry_type;
+  if (etype) return etype;
+
+  const id = o.entry_type_id || defaults.entry_type_id;
+
+  etype = TIMELINE_ENTRY_TYPES[id];
+  if (etype === undefined) throw new Error(`Invalid entry_type: ${etype}`);
+  return etype;
+}
+
 const requiredTimelineEntryFields = ['ts', 'entry_type_id', 'input_id', 'person_id'];
 
 function getTimelineEntryUUID(inputObject, { defaults = {} } = {}) {
@@ -277,6 +299,7 @@ function getTimelineEntryUUID(inputObject, { defaults = {} } = {}) {
     // may not match this standard, uuid sorting isn't guaranteed
     return getUUIDv7(o.ts, uuid);
   }
+  const entry_type_id = getEntryTypeId(o);
 
   const missing = requiredTimelineEntryFields.filter((d) => o[d] === undefined); // 0 could be an entry type value
 
@@ -286,7 +309,7 @@ function getTimelineEntryUUID(inputObject, { defaults = {} } = {}) {
   // attempted conversion here
 
   if (isNaN(ts)) throw new Error(`getTimelineEntryUUID got an invalid date:${o.ts || '<blank>'}`);
-  const idString = `${ts.toISOString()}-${o.person_id}-${o.entry_type_id}-${o.source_code_id || 0}`;
+  const idString = `${ts.toISOString()}-${o.person_id}-${entry_type_id}-${o.source_code_id || 0}`;
 
   if (!uuidIsValid(o.input_id)) {
     throw new Error(`Invalid input_id:'${o.input_id}', type ${typeof o.input_id} -- should be a uuid`);
@@ -297,27 +320,6 @@ function getTimelineEntryUUID(inputObject, { defaults = {} } = {}) {
   // But because outside specified remote_entry_uuid
   // may not match this standard, uuid sorting isn't guaranteed
   return getUUIDv7(ts, uuid);
-}
-function getEntryTypeId(o, { defaults = {} } = {}) {
-  let id = o.entry_type_id || defaults.entry_type_id;
-  if (id) return id;
-  const etype = o.entry_type || defaults.entry_type;
-  if (!etype) {
-    throw new Error('No entry_type, nor entry_type_id specified, specify a defaultEntryType');
-  }
-  id = TIMELINE_ENTRY_TYPES[etype];
-  if (id === undefined) throw new Error(`Invalid entry_type: ${etype}`);
-  return id;
-}
-function getEntryType(o, defaults = {}) {
-  let etype = o.entry_type || defaults.entry_type;
-  if (etype) return etype;
-
-  const id = o.entry_type_id || defaults.entry_type_id;
-
-  etype = TIMELINE_ENTRY_TYPES[id];
-  if (etype === undefined) throw new Error(`Invalid entry_type: ${etype}`);
-  return etype;
 }
 
 function getDateRangeArray(startDate, endDate) {

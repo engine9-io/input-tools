@@ -11,7 +11,7 @@ const {
   PutObjectCommand,
   ListObjectsV2Command
 } = require('@aws-sdk/client-s3');
-const { getTempFilename } = require('./tools');
+const { getTempFilename, relativeDate } = require('./tools');
 
 function Worker() {
   this.prefix = 's3';
@@ -261,9 +261,12 @@ Worker.prototype.list.metadata = {
   }
 };
 /* List everything with the prefix */
-Worker.prototype.listAll = async function ({ directory }) {
+Worker.prototype.listAll = async function (options) {
+  const { directory } = options;
   if (!directory) throw new Error('directory is required');
   let dir = directory;
+  const start = options.start && relativeDate(options.start);
+  const end = options.end && relativeDate(options.end);
   while (dir.slice(-1) === '/') dir = dir.slice(0, -1);
   const { Bucket, Key } = getParts(dir);
   const s3Client = this.getClient();
@@ -281,7 +284,16 @@ Worker.prototype.listAll = async function ({ directory }) {
     debug(`Sending List command with prefix ${Prefix} with ContinuationToken ${ContinuationToken}`);
 
     const result = await s3Client.send(command);
-    const newFiles = result.Contents?.map((d) => `${this.prefix}://${Bucket}/${d.Key}`) || [];
+    const newFiles =
+      result.Contents?.filter(({ LastModified }) => {
+        if (start && new Date(LastModified) < start) {
+          return false;
+        } else if (end && new Date(LastModified) > end) {
+          return false;
+        } else {
+          return true;
+        }
+      })?.map((d) => `${this.prefix}://${Bucket}/${d.Key}`) || [];
     debug(`Retrieved ${newFiles.length} new files, total ${files.length},sample ${newFiles.slice(0, 3).join(',')}`);
     files.push(...newFiles);
     ContinuationToken = result.NextContinuationToken;
