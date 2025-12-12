@@ -254,7 +254,7 @@ function getEntryTypeId(o, { defaults = {} } = {}) {
   if (id) return id;
   const etype = o.entry_type || defaults.entry_type;
   if (!etype) {
-    throw new Error('No entry_type, nor entry_type_id specified, specify a defaultEntryType');
+    throw new Error('No entry_type, nor entry_type_id specified, specify one to generate a timeline suitable ID');
   }
   id = TIMELINE_ENTRY_TYPES[etype];
   if (id === undefined) throw new Error(`Invalid entry_type: ${etype}`);
@@ -299,7 +299,7 @@ function getTimelineEntryUUID(inputObject, { defaults = {} } = {}) {
     // may not match this standard, uuid sorting isn't guaranteed
     return getUUIDv7(o.ts, uuid);
   }
-  const entry_type_id = getEntryTypeId(o);
+  o.entry_type_id = getEntryTypeId(o);
 
   const missing = requiredTimelineEntryFields.filter((d) => o[d] === undefined); // 0 could be an entry type value
 
@@ -309,7 +309,7 @@ function getTimelineEntryUUID(inputObject, { defaults = {} } = {}) {
   // attempted conversion here
 
   if (isNaN(ts)) throw new Error(`getTimelineEntryUUID got an invalid date:${o.ts || '<blank>'}`);
-  const idString = `${ts.toISOString()}-${o.person_id}-${entry_type_id}-${o.source_code_id || 0}`;
+  const idString = `${ts.toISOString()}-${o.person_id}-${o.entry_type_id}-${o.source_code_id || 0}`;
 
   if (!uuidIsValid(o.input_id)) {
     throw new Error(`Invalid input_id:'${o.input_id}', type ${typeof o.input_id} -- should be a uuid`);
