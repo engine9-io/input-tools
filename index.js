@@ -3,7 +3,7 @@ import path from 'node:path';
 import dayjs from 'dayjs';
 import debug$0 from 'debug';
 import unzipper from 'unzipper';
-import uuid from 'uuid';
+import { v4 as uuidv4, v5 as uuidv5, v7 as uuidv7, validate as uuidIsValid } from 'uuid';
 import archiver from 'archiver';
 import handlebars from 'handlebars';
 import FileUtilities from './file/FileUtilities.js';
@@ -11,7 +11,7 @@ import tools from './file/tools.js';
 import ForEachEntry from './ForEachEntry.js';
 import { TIMELINE_ENTRY_TYPES } from './timelineTypes.js';
 const debug = debug$0('@engine9/input-tools');
-const { v4: uuidv4, v5: uuidv5, v7: uuidv7, validate: uuidIsValid } = uuid;
+
 const {
   appendPostfix,
   bool,

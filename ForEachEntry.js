@@ -1,21 +1,19 @@
 import fs from 'node:fs';
 import nodestream from 'node:stream';
 import promises from 'node:stream/promises';
-import throttleDebounce from 'throttle-debounce';
+import { throttle } from 'throttle-debounce';
 import parallelTransform from 'parallel-transform';
 import debug$0 from 'debug';
-import asyncMutex from 'async-mutex';
-import csv from 'csv';
+import { Mutex } from 'async-mutex';
+import { stringify, parse } from 'csv';
 import handlebars from 'handlebars';
 import ValidatingReadable from './ValidatingReadable.js';
 import FileUtilities from './file/FileUtilities.js';
 import { getTempFilename, getBatchTransform, getFile, streamPacket } from './file/tools.js';
 const { Transform, Writable } = nodestream;
 const { pipeline } = promises;
-const { throttle } = throttleDebounce;
 const debug = debug$0('@engine9-io/input-tools');
 const debugThrottle = throttle(1000, debug, { noLeading: false, noTrailing: false });
-const { Mutex } = asyncMutex;
 class ForEachEntry {
   constructor({ accountId } = {}) {
     this.fileUtilities = new FileUtilities({ accountId });
@@ -65,7 +63,7 @@ class ForEachEntry {
             }
           })
         )
-        .pipe(csv.stringify({ header: true }))
+        .pipe(stringify({ header: true }))
         .pipe(writeStream);
       return this.outputStreams[name].items;
     });
@@ -162,7 +160,7 @@ class ForEachEntry {
     );
     await pipeline(
       inStream,
-      csv.parse({
+      parse({
         relax: true,
         skip_empty_lines: true,
         max_limit_on_data_read: 10000000,
