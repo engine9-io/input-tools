@@ -1,9 +1,9 @@
-const { describe, it } = require('node:test');
-const assert = require('node:assert');
-const debug = require('debug')('test/forEach');
-
-const { ForEachEntry } = require('../../index');
-
+import nodetest from 'node:test';
+import assert from 'node:assert';
+import * as debug$0 from 'debug';
+import { ForEachEntry } from '../../index.js';
+const { describe, it } = nodetest;
+const debug = debug$0('test/forEach');
 describe('Test Person File For Each', async () => {
   it('forEachPerson Should loop through 1000 sample people', async () => {
     let counter = 0;
@@ -24,7 +24,6 @@ describe('Test Person File For Each', async () => {
       },
       async transform(props) {
         const { batch, timelineOutputFileStream, sampleOutputFileStream } = props;
-
         batch.forEach((p) => {
           if (Math.random() > 0.9) {
             sampleOutputFileStream.push({
@@ -41,7 +40,6 @@ describe('Test Person File For Each', async () => {
             entry_type: 'EMAIL_DELIVERED'
           });
         });
-
         batch.forEach(() => {
           counter += 1;
         });

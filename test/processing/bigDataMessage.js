@@ -1,17 +1,16 @@
-const { describe, it } = require('node:test');
-const assert = require('node:assert');
-const debug = require('debug')('test:big-data');
-const { setTimeout } = require('node:timers/promises');
-//const { v7: uuidv7 } = require('uuid');
-
-const { ForEachEntry } = require('../../index');
-
+import nodetest from 'node:test';
+import assert from 'node:assert';
+import * as debug$0 from 'debug';
+import promises from 'node:timers/promises';
+import { ForEachEntry } from '../../index.js';
+const { describe, it } = nodetest;
+const debug = debug$0('test:big-data');
+const { setTimeout } = promises;
 describe('big-data message: forEachPerson', async () => {
   it('message: forEachPerson should loop through 1000000 sample people', async () => {
     const messageContent = [];
     let counter = 0;
     const forEach = new ForEachEntry();
-
     const output = await forEach.process({
       // packet: '../1000000_person_message.packet.zip',
       filename: '../1000000_person_message.packet/person/1000000_fake_people.csv',
@@ -47,7 +46,6 @@ describe('big-data message: forEachPerson', async () => {
       }
     });
     debug(output);
-
     assert.equal(counter, 1000000, `Expected to loop through 1000000 people, actual:${counter}`);
   });
   debug('Completed all tests');

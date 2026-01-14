@@ -1,5 +1,5 @@
-const { Readable } = require('node:stream');
-
+import nodestream from 'node:stream';
+const { Readable } = nodestream;
 /*
   A readable that will check data prior to it going into the stream
 */
@@ -8,9 +8,7 @@ class ValidatingReadable extends Readable {
     super(options);
     this.validator = validator || (() => true);
   }
-
   // _read() {super._read(size)}
-
   push(chunk) {
     try {
       this.validator(chunk);
@@ -20,5 +18,4 @@ class ValidatingReadable extends Readable {
     }
   }
 }
-
-module.exports = ValidatingReadable;
+export default ValidatingReadable;

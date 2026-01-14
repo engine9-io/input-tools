@@ -1,9 +1,9 @@
-const { it } = require('node:test');
-const assert = require('node:assert');
-const debug = require('debug')('files');
-
-const { FileUtilities } = require('../index');
-
+import nodetest from 'node:test';
+import assert from 'node:assert';
+import * as debug$0 from 'debug';
+import { FileUtilities } from '../index.js';
+const { it } = nodetest;
+const debug = debug$0('files');
 it('Should list a directory', async () => {
   const futil = new FileUtilities({ accountId: 'test' });
   let files = await futil.list({ directory: '.' });
@@ -14,7 +14,6 @@ it('Should list a directory', async () => {
   let endTest = await futil.list({ directory: '.', end: '1900-01-01' });
   assert(endTest.length === 0, 'Should NOT have any files before past end date');
 });
-
 it('Should be able to analyze CSV files with and without header lines', async () => {
   const futil = new FileUtilities({ accountId: 'test' });
   const f1 = await futil.columns({ filename: __dirname + '/sample/fileWithHead.csv' });

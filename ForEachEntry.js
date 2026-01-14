@@ -1,45 +1,37 @@
-const fs = require('node:fs');
-
-const { Transform, Writable } = require('node:stream');
-const { pipeline } = require('node:stream/promises');
-const { throttle } = require('throttle-debounce');
-const parallelTransform = require('parallel-transform');
-
-const debug = require('debug')('@engine9-io/input-tools');
-
+import fs from 'node:fs';
+import nodestream from 'node:stream';
+import promises from 'node:stream/promises';
+import throttleDebounce from 'throttle-debounce';
+import parallelTransform from 'parallel-transform';
+import debug$0 from 'debug';
+import asyncMutex from 'async-mutex';
+import csv from 'csv';
+import handlebars from 'handlebars';
+import ValidatingReadable from './ValidatingReadable.js';
+import FileUtilities from './file/FileUtilities.js';
+import { getTempFilename, getBatchTransform, getFile, streamPacket } from './file/tools.js';
+const { Transform, Writable } = nodestream;
+const { pipeline } = promises;
+const { throttle } = throttleDebounce;
+const debug = debug$0('@engine9-io/input-tools');
 const debugThrottle = throttle(1000, debug, { noLeading: false, noTrailing: false });
-
-const { Mutex } = require('async-mutex');
-
-const csv = require('csv');
-
-const handlebars = require('handlebars');
-const ValidatingReadable = require('./ValidatingReadable');
-const FileUtilities = require('./file/FileUtilities');
-
-const { getTempFilename, getBatchTransform, getFile, streamPacket } = require('./file/tools');
-
+const { Mutex } = asyncMutex;
 class ForEachEntry {
   constructor({ accountId } = {}) {
     this.fileUtilities = new FileUtilities({ accountId });
   }
-
   getOutputStream({ name, filename, postfix = '.timeline.csv', validatorFunction = () => true }) {
     this.outputStreams = this.outputStreams || {};
     if (this.outputStreams[name]?.items) return this.outputStreams[name].items;
-
     this.outputStreams[name] = this.outputStreams[name] || {
       mutex: new Mutex()
     };
-
     return this.outputStreams[name].mutex.runExclusive(async () => {
       let f = filename || (await getTempFilename({ postfix }));
-
       const fileInfo = {
         filename: f,
         records: 0
       };
-
       debug(`Output file requested ${name}, writing output to to: ${fileInfo.filename}`);
       const outputStream = new ValidatingReadable(
         {
@@ -47,9 +39,7 @@ class ForEachEntry {
         },
         validatorFunction
       );
-
       outputStream._read = () => {};
-
       const writeStream = fs.createWriteStream(fileInfo.filename);
       const finishWritingOutputPromise = new Promise((resolve, reject) => {
         writeStream
@@ -60,13 +50,11 @@ class ForEachEntry {
             reject(err);
           });
       });
-
       this.outputStreams[name].items = {
         stream: outputStream,
         promises: [finishWritingOutputPromise],
         files: [fileInfo]
       };
-
       outputStream
         .pipe(
           new Transform({
@@ -79,11 +67,9 @@ class ForEachEntry {
         )
         .pipe(csv.stringify({ header: true }))
         .pipe(writeStream);
-
       return this.outputStreams[name].items;
     });
   }
-
   async process({
     packet,
     filename,
@@ -94,7 +80,6 @@ class ForEachEntry {
     bindings = {}
   }) {
     let inStream = null;
-
     if (filename) {
       debug(`Processing file ${filename}`);
       inStream = (await this.fileUtilities.stream({ filename })).stream;
@@ -104,7 +89,6 @@ class ForEachEntry {
     }
     if (typeof userTransform !== 'function') throw new Error('async transform function is required');
     if (userTransform.length > 1) throw new Error('transform should be an async function that accepts one argument');
-
     let progressThrottle = () => {};
     if (typeof progress === 'function') {
       const startTime = new Date().getTime();
@@ -120,21 +104,15 @@ class ForEachEntry {
         { noLeading: false, noTrailing: false }
       );
     }
-
     let records = 0;
     let batches = 0;
-
     const outputFiles = {};
-
     const transformArguments = {};
     // An array of promises that must be completed, such as writing to disk
     let bindingPromises = [];
-
     // new Streams may be created, and they have to be completed when the file is completed
     const newStreams = [];
-
     const bindingNames = Object.keys(bindings);
-
     await Promise.all(
       bindingNames.map(async (bindingName) => {
         const binding = bindings[bindingName];
@@ -210,12 +188,9 @@ class ForEachEntry {
       })
     );
     debug('Completed all batches');
-
     newStreams.forEach((s) => s.push(null));
     await Promise.all(bindingPromises);
-
     return { outputFiles };
   }
 }
-
-module.exports = ForEachEntry;
+export default ForEachEntry;
