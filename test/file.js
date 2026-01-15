@@ -16,8 +16,8 @@ it('Should list a directory', async () => {
 });
 it('Should be able to analyze CSV files with and without header lines', async () => {
   const futil = new FileUtilities({ accountId: 'test' });
-  const f1 = await futil.columns({ filename: __dirname + '/sample/fileWithHead.csv' });
+  const f1 = await futil.columns({ filename: import.meta.dirname + '/sample/fileWithHead.csv' });
   assert.equal(f1.likelyHeaderLines, 1, 'Number of header lines should be 1');
-  const f2 = await futil.columns({ filename: __dirname + '/sample/fileWithoutHead.csv' });
+  const f2 = await futil.columns({ filename: import.meta.dirname + '/sample/fileWithoutHead.csv' });
   assert.equal(f2.likelyHeaderLines, 0, 'Number of header lines should be 1');
 });

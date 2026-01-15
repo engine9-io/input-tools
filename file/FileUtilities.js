@@ -530,7 +530,11 @@ Worker.prototype.stream = async function (options) {
       try {
         await fsp.stat(filename);
       } catch (e) {
-        debug(`Error reading file ${filename}, current directory: ${process.cwd()},__dirname:${__dirname}`);
+        debug(
+          `Error reading file ${filename}, current directory: ${process.cwd()},import.meta.dirname:${
+            import.meta.dirname
+          }`
+        );
         throw e;
       }
       stream = fs.createReadStream(filename);
