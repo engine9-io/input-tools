@@ -253,7 +253,7 @@ function getTimelineEntryUUID(inputObject, { defaults = {} } = {}) {
     // get a temp ID
     if (!o.input_id)
       throw new Error('Error generating timeline entry uuid -- remote_entry_id specified, but no input_id');
-    const uuid = uuidv5(o.remote_entry_id, o.input_id);
+    const uuid = uuidv5(String(o.remote_entry_id), o.input_id);
     // Change out the ts to match the v7 sorting.
     // But because outside specified remote_entry_uuid
     // may not match this standard, uuid sorting isn't guaranteed
