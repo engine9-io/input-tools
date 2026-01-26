@@ -253,11 +253,16 @@ function getTimelineEntryUUID(inputObject, { defaults = {} } = {}) {
     // get a temp ID
     if (!o.input_id)
       throw new Error('Error generating timeline entry uuid -- remote_entry_id specified, but no input_id');
-    const uuid = uuidv5(String(o.remote_entry_id), o.input_id);
-    // Change out the ts to match the v7 sorting.
-    // But because outside specified remote_entry_uuid
-    // may not match this standard, uuid sorting isn't guaranteed
-    return getUUIDv7(o.ts, uuid);
+    try {
+      const uuid = uuidv5(String(o.remote_entry_id), o.input_id);
+      // Change out the ts to match the v7 sorting.
+      // But because outside specified remote_entry_uuid
+      // may not match this standard, uuid sorting isn't guaranteed
+      return getUUIDv7(o.ts, uuid);
+    } catch (e) {
+      debug('Error getting uuid with object:', o);
+      throw e;
+    }
   }
   o.entry_type_id = getEntryTypeId(o);
   const missing = requiredTimelineEntryFields.filter((d) => o[d] === undefined); // 0 could be an entry type value
