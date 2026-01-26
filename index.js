@@ -167,7 +167,7 @@ function intToByteArray(_v) {
   return byteArray;
 }
 function getPluginUUID(uniqueNamespaceLikeDomainName, valueWithinNamespace) {
-  // Random custom namespace for plugins -- not secure, just a namespace:
+  // Random custom namespace for plugins -- not intended for cryptographically secure, just a unique namespace:
   return uuidv5(`${uniqueNamespaceLikeDomainName}::${valueWithinNamespace}`, 'f9e1024d-21ac-473c-bac6-64796dd771dd');
 }
 function getInputUUID(a, b) {
