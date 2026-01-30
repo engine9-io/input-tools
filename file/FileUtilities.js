@@ -810,7 +810,7 @@ Worker.prototype.move = async function ({ filename, target, remove = true }) {
       await fsp.rename(filename, target);
     } catch (e) {
       //it may be a filesystem issue moving between items
-      debug('Assuming this is a filesystem crosslink error, ignoring ', e.getMessage());
+      debug('Assuming this is a filesystem crosslink error, ignoring ', e);
       await fsp.copyFile(filename, target);
       await fsp.unlink(filename);
     }
